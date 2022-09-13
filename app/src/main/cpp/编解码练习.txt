@@ -1,0 +1,2228 @@
+===================================  C语言  =================================
+
+#include <jni.h>
+#include <string>
+#include "log4c.h"
+#include "util.h"
+
+
+extern "C" {
+#include <libavutil/avutil.h>
+#include <libavformat/avformat.h>
+#include <libavutil/imgutils.h>
+#include "libavcodec/avcodec.h"
+#include "libswscale/swscale.h"
+#include <libavutil/opt.h>
+#include <libswresample/swresample.h>
+}
+
+
+
+
+using namespace std;
+
+
+JavaVM *vm = nullptr;
+
+
+jstring helloFFmpeg(
+        JNIEnv *env,
+        jobject /* this */) {
+    std::string hello = av_version_info();
+
+    return env->NewStringUTF(hello.c_str());
+}
+
+
+// 重采样的MP3转pcm
+#define MAX_AUDIO_FRAME_SIZE 192000
+
+void pcm2aacSecond(JNIEnv *env, jobject /* this */, jstring input, jstring output) {
+
+    char *inFileName = const_cast<char *>(env->GetStringUTFChars(input, nullptr));
+    char *fileOut = const_cast<char *>(env->GetStringUTFChars(output, nullptr));
+
+
+    AVFormatContext *pFormatCtx;
+    AVOutputFormat *fmt;
+    AVStream *audio_st;
+    AVCodecContext *pCodecCtx;
+    AVCodec *pCodec;
+
+    uint8_t *frame_buf;
+    AVFrame *frame;
+    int size;
+
+    FILE *fileIn = fopen(inFileName, "rb");
+
+// 初始化注册FFMPEG以供使用
+    av_register_all();
+
+// 解码文件格式
+    avformat_alloc_output_context2(&pFormatCtx, NULL, NULL, fileOut);
+    fmt = pFormatCtx->oformat;
+
+//注意输出路径
+    if (avio_open(&pFormatCtx->pb, fileOut, AVIO_FLAG_READ_WRITE) < 0) {
+        LOGD("输出文件打开失败！\n");
+        return;
+    }
+
+    audio_st = avformat_new_stream(pFormatCtx, 0);
+    if (audio_st == NULL) {
+        LOGD("新建流失败!!!\n");
+        return;
+    }
+
+// 设定转码信息
+    pCodecCtx = audio_st->codec;
+    pCodecCtx->codec_id = fmt->audio_codec;
+    pCodecCtx->codec_type = AVMEDIA_TYPE_AUDIO;
+    pCodecCtx->sample_fmt = AV_SAMPLE_FMT_S16;
+    pCodecCtx->sample_rate = 44100;                // 音频的采样率
+    pCodecCtx->channel_layout = AV_CH_LAYOUT_STEREO;
+    pCodecCtx->channels = av_get_channel_layout_nb_channels(pCodecCtx->channel_layout);
+    pCodecCtx->bit_rate = 64000;                // 音频的比特率
+
+//调试输出格式信息
+    av_dump_format(pFormatCtx, 0, fileOut, 1);
+
+    pCodec = avcodec_find_encoder(pCodecCtx->codec_id);
+    if (!pCodec) {
+        LOGD("找不到输入文件所需的编码器!\n");
+        return;
+    }
+    if (avcodec_open2(pCodecCtx, pCodec, NULL) < 0) {
+        LOGD("打开编码器失败!\n");
+        return;
+    }
+
+    frame = av_frame_alloc();
+    frame->nb_samples = pCodecCtx->frame_size;
+    frame->format = pCodecCtx->sample_fmt;
+
+    size = av_samples_get_buffer_size(NULL, pCodecCtx->channels, pCodecCtx->frame_size,
+                                      pCodecCtx->sample_fmt, 1);
+    frame_buf = (uint8_t *) av_malloc(size);
+    avcodec_fill_audio_frame(frame, pCodecCtx->channels, pCodecCtx->sample_fmt,
+                             (const uint8_t *) frame_buf, size, 1);
+
+// 填充输出的头文件信息
+    avformat_write_header(pFormatCtx, NULL);
+
+    AVPacket pkt;
+    av_new_packet(&pkt, size);
+
+    for (int i = 0;; i++) {
+//读入PCM
+        if (fread(frame_buf, 1, size, fileIn) < 0) {
+            LOGD("文件读取错误！\n");
+            return;
+        } else if (feof(fileIn)) {
+            break;
+        }
+        frame->data[0] = frame_buf;  //采样信号
+
+        frame->pts = i * 100;
+        int got_frame = 0;
+//编码
+        int ret = avcodec_encode_audio2(pCodecCtx, &pkt, frame, &got_frame);
+        if (ret < 0) {
+            LOGD("编码错误！\n");
+            return;
+        }
+        if (got_frame == 1) {
+            pkt.stream_index = audio_st->index;
+            ret = av_write_frame(pFormatCtx, &pkt);
+            av_free_packet(&pkt);
+        }
+    }
+
+//写文件尾
+    av_write_trailer(pFormatCtx);
+
+//清理
+    if (audio_st) {
+        avcodec_close(audio_st->codec);
+        av_free(frame);
+        av_free(frame_buf);
+    }
+    avio_close(pFormatCtx->pb);
+    avformat_free_context(pFormatCtx);
+    fclose(fileIn);
+
+    LOGD("转码完毕！！！\n");
+    return;
+
+
+}
+
+
+void pcm2aac(JNIEnv *env, jobject /* this */, jstring input, jstring output) {
+
+    char *inFileName = const_cast<char *>(env->GetStringUTFChars(input, nullptr));
+    char *outFileName = const_cast<char *>(env->GetStringUTFChars(output, nullptr));
+
+    AVFormatContext *fmtCtx = nullptr;
+    AVCodecContext *codecCtx = nullptr;
+    const AVCodec *codec = nullptr;
+    AVFrame *frame = nullptr;
+    AVPacket *pkt = nullptr;
+
+    fmtCtx = avformat_alloc_context();
+    frame = av_frame_alloc();
+    pkt = av_packet_alloc();
+    pkt->data = nullptr;
+    pkt->size = 0;
+
+
+    int ret = 0;
+
+    do {
+        //==========Output information============
+
+        if (avformat_alloc_output_context2(&fmtCtx, NULL, NULL, outFileName) < 0) {
+            LOGD("Cannot alloc output file context.\n");
+            return;
+        }
+        const AVOutputFormat *outFmt = fmtCtx->oformat;
+
+        LOGD("编码器：%s", outFmt->name);
+        LOGD("编码器id： %u", outFmt->audio_codec);
+        LOGD("aac编码器id： %u", AV_CODEC_ID_AAC);
+
+
+        ret = avio_open(&fmtCtx->pb, outFileName, AVIO_FLAG_READ_WRITE);
+        if (ret < 0) {
+            LOGD("Cannot open output file: %d ", ret);
+            return;
+        }
+
+        AVStream *outStream = avformat_new_stream(fmtCtx, NULL);
+        if (!outStream) {
+            LOGD("Cannot create a new stream to output file.\n");
+            return;
+        }
+
+        //设置参数
+        AVCodecParameters *codecPara = fmtCtx->streams[outStream->index]->codecpar;
+        codecPara->codec_id = outFmt->audio_codec;
+        codecPara->codec_type = AVMEDIA_TYPE_AUDIO;
+        codecPara->format = AV_SAMPLE_FMT_S16;
+        codecPara->sample_rate = 44100;
+        codecPara->channel_layout = AV_CH_LAYOUT_STEREO;
+        codecPara->channels = av_get_channel_layout_nb_channels(codecPara->channel_layout);
+        codecPara->bit_rate = 64000;
+
+
+        //查找编码器
+        codec = avcodec_find_encoder(outFmt->audio_codec);
+        if (codec == NULL) {
+            LOGD("Cannot find audio encoder.\n");
+            return;
+        }
+
+        codecCtx = avcodec_alloc_context3(codec);
+        avcodec_parameters_to_context(codecCtx, codecPara);
+        if (codecCtx == NULL) {
+            LOGD("Cannot alloc codec ctx from para.\n");
+            return;
+        }
+
+        //打开编码器
+        ret = avcodec_open2(codecCtx, codec, NULL);
+        if (ret < 0) {
+            LOGD("Cannot open encoder %d", ret);
+            return;
+        }
+
+        av_dump_format(fmtCtx, 0, outFileName, 1);
+
+        //===========
+        frame->nb_samples = codecCtx->frame_size;
+        frame->format = codecCtx->sample_fmt;
+        frame->channels = 2;
+
+        // PCM重采样
+        struct SwrContext *swrCtx = swr_alloc_set_opts(NULL,
+                                                       av_get_default_channel_layout(
+                                                               codecCtx->channels),
+                                                       codecCtx->sample_fmt,
+                                                       codecCtx->sample_rate,
+                                                       av_get_default_channel_layout(
+                                                               frame->channels),
+                                                       AV_SAMPLE_FMT_S16,// PCM源文件的采样格式
+                                                       44100, 0, NULL);
+        swr_init(swrCtx);
+
+        /* 分配空间 */
+        uint8_t **convert_data = (uint8_t **) calloc(codecCtx->channels, sizeof(*convert_data));
+        av_samples_alloc(convert_data, NULL, codecCtx->channels, codecCtx->frame_size,
+                         codecCtx->sample_fmt, 0);
+
+        int size = av_samples_get_buffer_size(NULL, codecCtx->channels,
+                                              codecCtx->frame_size, codecCtx->sample_fmt, 1);
+        uint8_t *frameBuf = (uint8_t *) av_malloc(size);
+        avcodec_fill_audio_frame(frame, codecCtx->channels, codecCtx->sample_fmt,
+                                 (const uint8_t *) frameBuf, size, 1);
+
+        //写帧头
+        ret = avformat_write_header(fmtCtx, NULL);
+
+        FILE *inFile = fopen(inFileName, "rb");
+        if (!inFile) {
+            LOGD("Cannot open input file.\n");
+            return;
+        }
+
+        for (int i = 0;; i++) {
+            //输入一帧数据的长度
+            int length = frame->nb_samples * av_get_bytes_per_sample(AV_SAMPLE_FMT_S16) *
+                         frame->channels;
+            //读PCM：特意注意读取的长度，否则可能出现转码之后声音变快或者变慢
+            if (fread(frameBuf, 1, length, inFile) <= 0) {
+                LOGD("Cannot read raw data from file.\n");
+                return;
+            } else if (feof(inFile)) {
+                break;
+            }
+
+            swr_convert(swrCtx, convert_data, codecCtx->frame_size,
+                        (const uint8_t **) frame->data,
+                        frame->nb_samples);
+
+            //输出一帧数据的长度
+            length = codecCtx->frame_size * av_get_bytes_per_sample(codecCtx->sample_fmt);
+            //双通道赋值（输出的AAC为双通道）
+            memcpy(frame->data[0], convert_data[0], length);
+            memcpy(frame->data[1], convert_data[1], length);
+
+            frame->pts = i * 100;
+            if (avcodec_send_frame(codecCtx, frame) < 0) {
+                while (avcodec_receive_packet(codecCtx, pkt) >= 0) {
+                    pkt->stream_index = outStream->index;
+                    LOGD("write %4d frame, size=%d, length=%d\n", i, size, length);
+                    av_write_frame(fmtCtx, pkt);
+                }
+            }
+            av_packet_unref(pkt);
+        }
+
+
+        int ret = 0;
+        AVPacket *enc_pkt = av_packet_alloc();
+        enc_pkt->data = NULL;
+        enc_pkt->size = 0;
+
+        if (!(codecCtx->codec->capabilities & AV_CODEC_CAP_DELAY))
+            return;
+
+        LOGD("Flushing stream #%u encoder\n", outStream->index);
+        if ((ret = avcodec_send_frame(codecCtx, nullptr)) >= 0) {
+            while (avcodec_receive_packet(codecCtx, enc_pkt) >= 0) {
+                LOGD("success encoder 1 frame.\n");
+                /* mux encoded frame */
+                ret = av_write_frame(fmtCtx, enc_pkt);
+                if (ret < 0) {
+                    break;
+                }
+            }
+        }
+
+
+        // write trailer
+        av_write_trailer(fmtCtx);
+
+        fclose(inFile);
+        av_free(frameBuf);
+
+
+    } while (0);
+
+    avcodec_close(codecCtx);
+    av_free(frame);
+    avio_close(fmtCtx->pb);
+    avformat_free_context(fmtCtx);
+
+
+}
+
+void pcm2mp3(JNIEnv *env, jobject /* this */, jstring input, jstring output) {
+
+    char *inFileName = const_cast<char *>(env->GetStringUTFChars(input, nullptr));
+    char *outFileName = const_cast<char *>(env->GetStringUTFChars(output, nullptr));
+
+    AVFormatContext *fmtCtx = nullptr;
+    AVCodecContext *codecCtx = nullptr;
+    const AVCodec *codec = nullptr;
+    AVFrame *frame = nullptr;
+    AVPacket *pkt = nullptr;
+
+    fmtCtx = avformat_alloc_context();
+    frame = av_frame_alloc();
+    pkt = av_packet_alloc();
+    pkt->data = nullptr;
+    pkt->size = 0;
+
+
+    int ret = 0;
+
+    do {
+        //==========Output information============
+
+        if (avformat_alloc_output_context2(&fmtCtx, NULL, NULL, outFileName) < 0) {
+            LOGD("Cannot alloc output file context.\n");
+            return;
+        }
+        const AVOutputFormat *outFmt = fmtCtx->oformat;
+
+        LOGD("编码器：%s", outFmt->name);
+        LOGD("编码器id： %u", outFmt->audio_codec);
+
+
+        if (avio_open(&fmtCtx->pb, outFileName, AVIO_FLAG_READ_WRITE) < 0) {
+            LOGD("Cannot open output file.\n");
+            return;
+        }
+
+        AVStream *outStream = avformat_new_stream(fmtCtx, NULL);
+        if (!outStream) {
+            LOGD("Cannot create a new stream to output file.\n");
+            return;
+        }
+
+        //设置参数
+        AVCodecParameters *codecPara = fmtCtx->streams[outStream->index]->codecpar;
+        codecPara->codec_type = AVMEDIA_TYPE_AUDIO;
+        codecPara->codec_id = outFmt->audio_codec;
+        codecPara->sample_rate = 44100;
+        codecPara->channel_layout = AV_CH_LAYOUT_STEREO;
+        codecPara->bit_rate = 128000;
+        codecPara->format = AV_SAMPLE_FMT_FLTP;
+        codecPara->channels = av_get_channel_layout_nb_channels(codecPara->channel_layout);
+
+
+        //查找编码器
+        codec = avcodec_find_encoder(outFmt->audio_codec);
+        if (codec == NULL) {
+            LOGD("Cannot find audio encoder.\n");
+            return;
+        }
+
+        codecCtx = avcodec_alloc_context3(codec);
+        avcodec_parameters_to_context(codecCtx, codecPara);
+        if (codecCtx == NULL) {
+            LOGD("Cannot alloc codec ctx from para.\n");
+            return;
+        }
+
+        //打开编码器
+        if (avcodec_open2(codecCtx, codec, NULL) < 0) {
+            LOGD("Cannot open encoder.\n");
+            return;
+        }
+
+        av_dump_format(fmtCtx, 0, outFileName, 1);
+
+        //===========
+        frame->nb_samples = codecCtx->frame_size;
+        frame->format = codecCtx->sample_fmt;
+        frame->channels = 2;
+
+        // PCM重采样
+        struct SwrContext *swrCtx = swr_alloc_set_opts(NULL,
+                                                       av_get_default_channel_layout(
+                                                               codecCtx->channels),
+                                                       codecCtx->sample_fmt,
+                                                       codecCtx->sample_rate,
+                                                       av_get_default_channel_layout(
+                                                               frame->channels),
+                                                       AV_SAMPLE_FMT_S16,// PCM源文件的采样格式
+                                                       44100, 0, NULL);
+        swr_init(swrCtx);
+
+        /* 分配空间 */
+        uint8_t **convert_data = (uint8_t **) calloc(codecCtx->channels, sizeof(*convert_data));
+        av_samples_alloc(convert_data, NULL, codecCtx->channels, codecCtx->frame_size,
+                         codecCtx->sample_fmt, 0);
+
+        int size = av_samples_get_buffer_size(NULL, codecCtx->channels,
+                                              codecCtx->frame_size, codecCtx->sample_fmt, 1);
+        uint8_t *frameBuf = (uint8_t *) av_malloc(size);
+        avcodec_fill_audio_frame(frame, codecCtx->channels, codecCtx->sample_fmt,
+                                 (const uint8_t *) frameBuf, size, 1);
+
+        //写帧头
+        ret = avformat_write_header(fmtCtx, NULL);
+
+        FILE *inFile = fopen(inFileName, "rb");
+        if (!inFile) {
+            LOGD("Cannot open input file.\n");
+            return;
+        }
+
+        for (int i = 0;; i++) {
+            //输入一帧数据的长度
+            int length = frame->nb_samples * av_get_bytes_per_sample(AV_SAMPLE_FMT_S16) *
+                         frame->channels;
+            //读PCM：特意注意读取的长度，否则可能出现转码之后声音变快或者变慢
+            if (fread(frameBuf, 1, length, inFile) <= 0) {
+                LOGD("Cannot read raw data from file.\n");
+                return;
+            } else if (feof(inFile)) {
+                break;
+            }
+
+            swr_convert(swrCtx, convert_data, codecCtx->frame_size,
+                        (const uint8_t **) frame->data,
+                        frame->nb_samples);
+
+            //输出一帧数据的长度
+            length = codecCtx->frame_size * av_get_bytes_per_sample(codecCtx->sample_fmt);
+            //双通道赋值（输出的AAC为双通道）
+            memcpy(frame->data[0], convert_data[0], length);
+            memcpy(frame->data[1], convert_data[1], length);
+
+            frame->pts = i * 100;
+            if (avcodec_send_frame(codecCtx, frame) < 0) {
+                while (avcodec_receive_packet(codecCtx, pkt) >= 0) {
+                    pkt->stream_index = outStream->index;
+                    LOGD("write %4d frame, size=%d, length=%d\n", i, size, length);
+                    av_write_frame(fmtCtx, pkt);
+                }
+            }
+            av_packet_unref(pkt);
+        }
+
+
+        int ret = 0;
+        AVPacket *enc_pkt = av_packet_alloc();
+        enc_pkt->data = NULL;
+        enc_pkt->size = 0;
+
+        if (!(codecCtx->codec->capabilities & AV_CODEC_CAP_DELAY))
+            return;
+
+        LOGD("Flushing stream #%u encoder\n", outStream->index);
+        if ((ret = avcodec_send_frame(codecCtx, nullptr)) >= 0) {
+            while (avcodec_receive_packet(codecCtx, enc_pkt) >= 0) {
+                LOGD("success encoder 1 frame.\n");
+                /* mux encoded frame */
+                ret = av_write_frame(fmtCtx, enc_pkt);
+                if (ret < 0) {
+                    break;
+                }
+            }
+        }
+
+
+        // write trailer
+        av_write_trailer(fmtCtx);
+
+        fclose(inFile);
+        av_free(frameBuf);
+
+
+    } while (0);
+
+    avcodec_close(codecCtx);
+    av_free(frame);
+    avio_close(fmtCtx->pb);
+    avformat_free_context(fmtCtx);
+
+}
+
+
+// 重采样了
+void mp3Topcm2(JNIEnv *env, jobject /* this */, jstring input, jstring output) {
+
+    char *inFileName = const_cast<char *>(env->GetStringUTFChars(input, nullptr));
+    char *outFileName = const_cast<char *>(env->GetStringUTFChars(output, nullptr));
+
+
+    FILE *file = fopen(outFileName, "w+b");
+    if (!file) {
+        printf("Cannot open output file.\n");
+        return;
+    }
+
+    AVFormatContext *fmtCtx = avformat_alloc_context();
+    AVCodecContext *codecCtx = NULL;
+    AVPacket *pkt = av_packet_alloc();
+    AVFrame *frame = av_frame_alloc();
+
+    int aStreamIndex = -1;
+
+    do {
+        if (avformat_open_input(&fmtCtx, inFileName, NULL, NULL) < 0) {
+            printf("Cannot open input file.\n");
+            break;
+        }
+        if (avformat_find_stream_info(fmtCtx, NULL) < 0) {
+            printf("Cannot find any stream in file.\n");
+            break;
+        }
+
+        av_dump_format(fmtCtx, 0, inFileName, 0);
+
+        for (size_t i = 0; i < fmtCtx->nb_streams; i++) {
+            if (fmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+                aStreamIndex = (int) i;
+                break;
+            }
+        }
+        if (aStreamIndex == -1) {
+            printf("Cannot find audio stream.\n");
+            break;
+        }
+
+        AVCodecParameters *aCodecPara = fmtCtx->streams[aStreamIndex]->codecpar;
+        AVCodec *codec = avcodec_find_decoder(aCodecPara->codec_id);
+        if (!codec) {
+            printf("Cannot find any codec for audio.\n");
+            break;
+        }
+        codecCtx = avcodec_alloc_context3(codec);
+        if (avcodec_parameters_to_context(codecCtx, aCodecPara) < 0) {
+            printf("Cannot alloc codec context.\n");
+            break;
+        }
+        codecCtx->pkt_timebase = fmtCtx->streams[aStreamIndex]->time_base;
+
+        if (avcodec_open2(codecCtx, codec, NULL) < 0) {
+            printf("Cannot open audio codec.\n");
+            break;
+        }
+
+        //设置转码参数
+        uint64_t out_channel_layout = codecCtx->channel_layout;
+        enum AVSampleFormat out_sample_fmt = AV_SAMPLE_FMT_S16;
+        int out_sample_rate = codecCtx->sample_rate;
+        int out_channels = av_get_channel_layout_nb_channels(out_channel_layout);
+
+        LOGD("codecCtx->channel_layout: %lu", codecCtx->channel_layout)
+        LOGD("out_sample_rate: %d", out_sample_rate)
+        LOGD("out_sample_rate: %d", out_channels)
+
+
+        uint8_t *audio_out_buffer = (uint8_t *) av_malloc(MAX_AUDIO_FRAME_SIZE * 2);
+
+        SwrContext *swr_ctx = swr_alloc_set_opts(NULL,
+                                                 out_channel_layout,
+                                                 out_sample_fmt,
+                                                 out_sample_rate,
+                                                 codecCtx->channel_layout,
+                                                 codecCtx->sample_fmt,
+                                                 codecCtx->sample_rate,
+                                                 0, NULL);
+        swr_init(swr_ctx);
+
+        while (av_read_frame(fmtCtx, pkt) >= 0) {
+            if (pkt->stream_index == aStreamIndex) {
+                if (avcodec_send_packet(codecCtx, pkt) >= 0) {
+                    while (avcodec_receive_frame(codecCtx, frame) >= 0) {
+                        /*
+                          Planar（平面），其数据格式排列方式为 (特别记住，该处是以点nb_samples采样点来交错，不是以字节交错）:
+                          LLLLLLRRRRRRLLLLLLRRRRRRLLLLLLRRRRRRL...（每个LLLLLLRRRRRR为一个音频帧）
+                          而不带P的数据格式（即交错排列）排列方式为：
+                          LRLRLRLRLRLRLRLRLRLRLRLRLRLRLRLRLRLRL...（每个LR为一个音频样本）
+                        */
+                        if (av_sample_fmt_is_planar(codecCtx->sample_fmt)) {
+                            int len = swr_convert(swr_ctx,
+                                                  &audio_out_buffer,
+                                                  MAX_AUDIO_FRAME_SIZE * 2,
+                                                  (const uint8_t **) frame->data,
+                                                  frame->nb_samples);
+                            if (len <= 0) {
+                                continue;
+                            }
+
+                            int dst_bufsize = av_samples_get_buffer_size(0,
+                                                                         out_channels,
+                                                                         len,
+                                                                         out_sample_fmt,
+                                                                         1);
+
+                            //int numBytes =av_get_bytes_per_sample(out_sample_fmt);
+                            //printf("number bytes is: %d.\n",numBytes);
+
+                            fwrite(audio_out_buffer, 1, dst_bufsize, file);
+
+                            //pcm播放时是LRLRLR格式，所以要交错保存数据
+                            //                        for(int i=0;i<frame->nb_samples;i++){
+                            //                            for(int ch=0;ch<2;ch++){
+                            //                                fwrite((char*)audio_out_buffer[ch]+numBytes*i,1,numBytes,file);
+                            //                            }
+                            //                        }
+                        }
+                    }
+                }
+            }
+            av_packet_unref(pkt);
+        }
+    } while (0);
+
+    av_frame_free(&frame);
+    av_packet_free(&pkt);
+    avcodec_close(codecCtx);
+    avcodec_free_context(&codecCtx);
+    avformat_free_context(fmtCtx);
+
+    fclose(file);
+
+    return;
+
+}
+
+
+void mp3Topcm(JNIEnv *env, jobject /* this */, jstring input, jstring output) {
+
+    char *in_file = const_cast<char *>(env->GetStringUTFChars(input, nullptr));
+    char *out_file = const_cast<char *>(env->GetStringUTFChars(output, nullptr));
+
+
+    AVFormatContext *avFormatContext = nullptr;
+    AVCodecContext *avCodecContext = nullptr;
+
+    AVCodec *avCodec = nullptr;
+
+    int ret = -1;
+    int audioIndex = -1;
+
+    AVPacket *avPacket = nullptr;
+    AVFrame *avFrame = nullptr;
+    AVFrame *pcmFrame = nullptr;
+
+
+    av_register_all();
+
+    // 1.打开ffmpeg上下文，并且与输出文件联系
+    ret = avformat_alloc_output_context2(&avFormatContext, nullptr, nullptr, out_file);
+    if (ret < 0) {
+        return;
+    }
+
+    // 2.打开输入文件，并将信息保存在 av_format_ctx
+    ret = avformat_open_input(&avFormatContext, in_file, nullptr, nullptr);
+    if (ret != 0) {
+        return;
+    }
+
+    // 3.再打开文件中的流信息，将信息保存在 av_format_ctx
+    ret = avformat_find_stream_info(avFormatContext, nullptr);
+    if (ret < 0) {
+        return;
+    }
+
+    // 遍历所有的流
+    for (int i = 0; i < avFormatContext->nb_streams; ++i) {
+
+        // 拿流
+        AVStream *avStream = avFormatContext->streams[i];
+        // 流的参数
+        AVCodecParameters *avCodecParameters = avStream->codecpar;
+        // 编码器id
+        AVCodecID avCodecId = avCodecParameters->codec_id;
+        // 类型
+        AVMediaType codec_type = avCodecParameters->codec_type;
+
+        if (codec_type == AVMEDIA_TYPE_AUDIO) {
+            audioIndex = i;
+
+            // 找到解码器
+            avCodec = avcodec_find_decoder(avCodecId);
+            // 解码器上下文
+            avCodecContext = avcodec_alloc_context3(avCodec);
+
+            // 将流的参数给上下文
+            ret = avcodec_parameters_to_context(avCodecContext, avCodecParameters);
+            if (ret < 0) {
+                return;
+            }
+            // 打开解码器
+            avcodec_open2(avCodecContext, avCodec, nullptr);
+            if (ret != 0) {
+                return;
+            }
+            break;
+        }
+
+    }
+
+    // 工作区
+    avFrame = av_frame_alloc();
+    avPacket = av_packet_alloc();
+
+
+    FILE *out_put = fopen(out_file, "wb");
+    if (!out_put) {
+        LOGD("can not open file!")
+        return;
+    }
+
+    while (av_read_frame(avFormatContext, avPacket) >= 0) {
+        if (avPacket->stream_index == audioIndex) {
+            ret = avcodec_send_packet(avCodecContext, avPacket);
+            if (ret < 0) {
+                break;
+            }
+
+
+            while (true) {
+                ret = avcodec_receive_frame(avCodecContext, avFrame);
+                if (ret < 0) {
+                    break;
+                }
+
+
+                int data_size = -1;
+                if ((data_size = av_get_bytes_per_sample(avCodecContext->sample_fmt)) < 0) {
+                    printf("Failed to calculate data...\n");
+                    exit(1);
+                }
+                for (int i = 0; i < avFrame->nb_samples; i++) {
+                    for (int ch = 0; ch < avCodecContext->channels; ch++)
+                        fwrite(avFrame->data[ch] + data_size * i, 1, data_size, out_put);
+                }
+
+
+            }
+        }
+        av_packet_unref(avPacket);
+    }
+
+    fclose(out_put);
+    av_frame_free(&avFrame);
+    avcodec_close(avCodecContext);
+    avformat_close_input(&avFormatContext);
+
+}
+
+
+void h264Toyuv2(JNIEnv *env, jobject /* this */, jstring input, jstring output) {
+    char *in_file = const_cast<char *>(env->GetStringUTFChars(input, nullptr));
+    char *out_file = const_cast<char *>(env->GetStringUTFChars(output, nullptr));
+}
+
+
+void h264Toyuv(JNIEnv *env, jobject /* this */, jstring input, jstring output) {
+    char *in_file = const_cast<char *>(env->GetStringUTFChars(input, nullptr));
+    char *out_file = const_cast<char *>(env->GetStringUTFChars(output, nullptr));
+
+
+    AVFormatContext *fmt_ctx = NULL;
+    AVCodecContext *cod_ctx = NULL;
+    AVCodec *cod = NULL;
+    struct SwsContext *img_convert_ctx = NULL;
+    int ret = 0;
+    AVPacket packet;
+
+    //第一步创建输入文件AVFormatContext
+    fmt_ctx = avformat_alloc_context();
+    if (fmt_ctx == NULL) {
+        ret = -1;
+        LOGD("alloc fail");
+        return;
+    }
+    if (avformat_open_input(&fmt_ctx, in_file, NULL, NULL) != 0) {
+        ret = -1;
+        LOGD("open fail");
+        return;
+    }
+
+    //第二步 查找文件相关流，并初始化AVFormatContext中的流信息
+    if (avformat_find_stream_info(fmt_ctx, NULL) < 0) {
+        ret = -1;
+        LOGD("find stream fail");
+        return;
+    }
+
+    av_dump_format(fmt_ctx, 0, in_file, 0);
+
+    //第三步查找视频流索引和解码器
+    int stream_index = av_find_best_stream(fmt_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, &cod, -1);
+
+    //第四步设置解码器上下文并打开解码器
+    AVCodecParameters *codecpar = fmt_ctx->streams[stream_index]->codecpar;
+    if (!cod) {
+        ret = -1;
+        LOGD("find codec fail");
+        return;
+    }
+    cod_ctx = avcodec_alloc_context3(cod);
+    avcodec_parameters_to_context(cod_ctx, codecpar);
+    ret = avcodec_open2(cod_ctx, cod, NULL);
+    if (ret < 0) {
+        LOGD("can't open codec");
+        return;
+    }
+
+    //第五步打开输出文件
+    FILE *out_fb = NULL;
+    out_fb = fopen(out_file, "wb");
+    if (!out_fb) {
+        LOGD("can't open file");
+        return;
+    }
+
+    //创建packet,用于存储解码前的数据
+    av_init_packet(&packet);
+
+
+    //第六步创建Frame，用于存储解码后的数据
+    AVFrame *frame = av_frame_alloc();
+    frame->width = codecpar->width;
+    frame->height = codecpar->height;
+    frame->format = codecpar->format;
+    av_frame_get_buffer(frame, 32);
+
+    AVFrame *yuv_frame = av_frame_alloc();
+    yuv_frame->width = codecpar->width;
+    yuv_frame->height = codecpar->height;
+    yuv_frame->format = AV_PIX_FMT_YUV420P;
+    av_frame_get_buffer(yuv_frame, 32);
+
+    // size_t writesize = av_image_get_buffer_size(frame->format, frame->width,frame->height, 32);
+    //第七步重采样初始化与设置参数
+    // uint8_t **data = (uint8_t **)av_calloc((size_t)out_channels, sizeof(*data))
+
+    img_convert_ctx = sws_getContext(cod_ctx->width, cod_ctx->height,
+                                     cod_ctx->pix_fmt,
+                                     cod_ctx->width, cod_ctx->height,
+                                     AV_PIX_FMT_YUV420P,
+                                     SWS_BICUBIC,
+                                     NULL, NULL, NULL);
+
+
+
+
+    //while循环，每次读取一帧，并转码
+    //第八步 读取数据并解码,重采样进行保存
+    int count = 0;
+    while (av_read_frame(fmt_ctx, &packet) >= 0) {
+        if (packet.stream_index != stream_index) {
+            av_packet_unref(&packet);
+            continue;
+        }
+
+
+        ret = avcodec_send_packet(cod_ctx, &packet);
+        if (ret < 0) {
+            ret = -1;
+            printf("decode error");
+            return;
+        }
+
+        while (avcodec_receive_frame(cod_ctx, frame) >= 0) {
+            printf("decode frame count = %d\n", count++);
+            sws_scale(img_convert_ctx,
+                      (const uint8_t **) frame->data,
+                      frame->linesize,
+                      0,
+                      codecpar->height,
+                      yuv_frame->data,
+                      yuv_frame->linesize);
+            int y_size = cod_ctx->width * cod_ctx->height;
+            fwrite(yuv_frame->data[0], 1, y_size, out_fb);
+            fwrite(yuv_frame->data[1], 1, y_size / 4, out_fb);
+            fwrite(yuv_frame->data[2], 1, y_size / 4, out_fb);
+        }
+
+        av_packet_unref(&packet);
+    }
+
+
+    if (fmt_ctx) {
+        avformat_close_input(&fmt_ctx);
+        avformat_free_context(fmt_ctx);
+    }
+
+    if (cod_ctx) {
+        avcodec_close(cod_ctx);
+        avcodec_free_context(&cod_ctx);
+    }
+
+    if (out_fb) {
+        fclose(out_fb);
+    }
+
+    if (frame) {
+        av_frame_free(&frame);
+    }
+
+    if (yuv_frame) {
+        av_frame_free(&yuv_frame);
+    }
+
+    if (img_convert_ctx) {
+        sws_freeContext(img_convert_ctx);
+    }
+
+
+}
+
+
+void yuvToH264Second(JNIEnv *env, jobject /* this */, jstring input, jstring output) {
+    char *filename_in = const_cast<char *>(env->GetStringUTFChars(input, nullptr));
+    char *filename_out = const_cast<char *>(env->GetStringUTFChars(output, nullptr));
+
+
+    AVFormatContext *avFormatContext = nullptr;
+    AVCodecContext *avCodecContext = nullptr;
+    AVCodec *avCodec = nullptr;
+
+    AVStream *avStream = nullptr;
+
+    AVFrame *yuvFrame = nullptr;
+    AVPacket *avPacket = nullptr;
+
+    AVOutputFormat *avOutputFormat = nullptr;
+
+    uint8_t *frame_buf = nullptr;
+
+    int ret = -1;
+    int in_w = 480, in_h = 272;
+
+    // 1.
+    av_register_all();
+    // 2.
+    avformat_alloc_output_context2(&avFormatContext, nullptr, nullptr, filename_out);
+
+    avOutputFormat = avFormatContext->oformat;
+    LOGD("编码器：%s", avOutputFormat->name);
+    LOGD("编码器id： %u", avOutputFormat->video_codec);
+
+
+    avCodec = avcodec_find_encoder(avOutputFormat->video_codec);
+    if (!avCodec) {
+        LOGD("Codec not found\n");
+        return;
+    }
+    avCodecContext = avcodec_alloc_context3(avCodec);
+    if (!avCodecContext) {
+        LOGD("Could not allocate video codec context\n");
+        return;
+    }
+
+    avCodecContext->bit_rate = 400000;
+    avCodecContext->width = in_w;
+    avCodecContext->height = in_h;
+    avCodecContext->time_base.num = 1;
+    avCodecContext->time_base.den = 25;
+    avCodecContext->gop_size = 10;
+    avCodecContext->max_b_frames = 1;
+    avCodecContext->pix_fmt = AV_PIX_FMT_YUV420P;
+
+    av_opt_set(avCodecContext->priv_data, "preset", "slow", 0);
+
+    av_opt_set(avCodecContext->priv_data, "tune", "zerolatency", 0);
+
+    ret = avcodec_open2(avCodecContext, avCodec, NULL);
+    if (ret < 0) {
+        LOGD("Could not open codec: %d", ret);
+        return;
+    } else {
+        LOGD("open success")
+    }
+
+
+    // 3.
+    if (avio_open(&avFormatContext->pb, filename_out, AVIO_FLAG_READ_WRITE) < 0) {
+        LOGD("AVIO 打开失败")
+        return;
+    }
+
+    // 4.
+    avStream = avformat_new_stream(avFormatContext, avCodec);
+    avStream->time_base.num = 1;
+    avStream->time_base.den = 25;
+
+    // 4.
+    yuvFrame = av_frame_alloc();
+    if (!yuvFrame) {
+        LOGD("Could not allocate video frame");
+        return;
+    }
+    yuvFrame->format = avCodecContext->pix_fmt;
+    yuvFrame->width = avCodecContext->width;
+    yuvFrame->height = avCodecContext->height;
+
+//    ret = av_image_alloc(yuvFrame->data, yuvFrame->linesize, avCodecContext->width, avCodecContext->height,
+//                         avCodecContext->pix_fmt, 16);
+
+
+    // 5.
+    int size = av_image_get_buffer_size(avCodecContext->pix_fmt,
+                                        avCodecContext->width,
+                                        avCodecContext->height, 1);
+
+    frame_buf = static_cast<uint8_t *>(av_malloc(size));
+
+
+    av_image_fill_arrays(yuvFrame->data,
+                         yuvFrame->linesize,
+                         frame_buf,
+                         avCodecContext->pix_fmt,
+                         avCodecContext->width,
+                         avCodecContext->height, 16);
+
+
+    // 10.
+    avformat_write_header(avFormatContext, nullptr);
+
+    int y_size = avCodecContext->width * avCodecContext->height;
+
+    avPacket = av_packet_alloc();
+
+    // 11.
+    FILE *in_file = fopen(filename_in, "rb");
+    if (!in_file) {
+        LOGD("can not open file!")
+        return;
+    }
+
+    FILE *out_file = fopen(filename_out, "wb");
+    if (!out_file) {
+        LOGD("can not open file!")
+        return;
+    }
+
+
+    // 12.
+    int i = 0;
+    while (true) {
+        av_init_packet(avPacket);
+        avPacket->data = nullptr;    // packet data will be allocated by the encoder
+        avPacket->size = 0;
+        if (fread(frame_buf, 1, y_size * 3 / 2, in_file) < 0) {
+            LOGD("read file fail!")
+            break;
+        } else if (feof(in_file)) {
+            break;
+        }
+
+//        yuvFrame->data[0] = frame_buf; //亮度Y
+//        yuvFrame->data[1] = frame_buf + y_size; //U
+//        yuvFrame->data[2] = frame_buf + y_size * 5 / 4; //V
+//        yuvFrame->linesize[0] = yuvFrame->width;// y数据的行宽
+//        yuvFrame->linesize[1] = yuvFrame->width / 2;// u数据的行宽
+//        yuvFrame->linesize[2] = yuvFrame->width / 2;// v数据的行宽
+
+        yuvFrame->pts = i;
+        i += 1;
+        // 13.
+        avcodec_send_frame(avCodecContext, yuvFrame);
+        while (true) {
+            int ret = avcodec_receive_packet(avCodecContext, avPacket);
+            if (ret) {
+                av_packet_unref(avPacket);
+                break;
+            }
+
+//            av_packet_rescale_ts(avPacket, avCodecContext->time_base, avStream->time_base);
+//            avPacket->stream_index = avStream->index;
+//
+//            // 将帧写入视频文件中，
+//            // 与av_write_frame的区别是,将对 packet 进行缓存和 pts 检查。
+//            av_interleaved_write_frame(avFormatContext, avPacket);
+//            av_packet_unref(avPacket);
+
+
+
+            fwrite(avPacket->data, 1, avPacket->size, out_file);
+            av_packet_unref(avPacket);
+            LOGD("Succeed to encode frame: %5d\tsize:%5d\n", i, avPacket->size);
+
+
+        }
+
+    }
+//
+//
+    // 13.
+    avcodec_send_frame(avCodecContext, nullptr);
+    while (true) {
+        int ret = avcodec_receive_packet(avCodecContext, avPacket);
+        if (ret) {
+            av_packet_unref(avPacket);
+            break;
+        }
+
+//        av_packet_rescale_ts(avPacket, avCodecContext->time_base, avStream->time_base);
+//        avPacket->stream_index = avStream->index;
+//
+//        // 将帧写入视频文件中，
+//        // 与av_write_frame的区别是,将对 packet 进行缓存和 pts 检查。
+//        av_interleaved_write_frame(avFormatContext, avPacket);
+//
+//        av_packet_unref(avPacket);
+
+
+        fwrite(avPacket->data, 1, avPacket->size, out_file);
+        av_packet_unref(avPacket);
+        LOGD("Succeed to encode frame: %5d\tsize:%5d\n", i, avPacket->size);
+    }
+
+
+    fclose(in_file);
+    avcodec_close(avCodecContext);
+    av_free(yuvFrame);
+    av_free(frame_buf);
+    av_free_packet(avPacket);
+    av_write_trailer(avFormatContext);
+    avio_close(avFormatContext->pb);
+    avformat_free_context(avFormatContext);
+
+
+}
+
+jint yuvToH264(JNIEnv *env, jobject /* this */, jstring input, jstring output) {
+    char *filename_in = const_cast<char *>(env->GetStringUTFChars(input, nullptr));
+    char *filename_out = const_cast<char *>(env->GetStringUTFChars(output, nullptr));
+
+    AVCodec *pCodec;
+    AVCodecContext *pCodecCtx = NULL;
+    int i, ret, got_output;
+    FILE *fp_in;
+    FILE *fp_out;
+    AVFrame *pFrame;
+    AVPacket pkt;
+    int y_size;
+    int framecnt = 0;
+
+
+
+//    AVCodecID codec_id=AV_CODEC_ID_HEVC;
+
+    AVCodecID codec_id = AV_CODEC_ID_H264;
+
+
+    int in_w = 480, in_h = 272;
+    int framenum = 100;
+
+    avcodec_register_all();
+
+    pCodec = avcodec_find_encoder(codec_id);
+    if (!pCodec) {
+        LOGD("Codec not found\n");
+        return -1;
+    }
+    pCodecCtx = avcodec_alloc_context3(pCodec);
+    if (!pCodecCtx) {
+        LOGD("Could not allocate video codec context\n");
+        return -1;
+    }
+    pCodecCtx->bit_rate = 400000;
+    pCodecCtx->width = in_w;
+    pCodecCtx->height = in_h;
+    pCodecCtx->time_base.num = 1;
+    pCodecCtx->time_base.den = 25;
+    pCodecCtx->gop_size = 10;
+    pCodecCtx->max_b_frames = 1;
+    pCodecCtx->pix_fmt = AV_PIX_FMT_YUV420P;
+
+    if (codec_id == AV_CODEC_ID_H264)
+        av_opt_set(pCodecCtx->priv_data, "preset", "slow", 0);
+
+    ret = avcodec_open2(pCodecCtx, pCodec, NULL);
+    if (ret < 0) {
+        LOGD("Could not open codec: %d", ret);
+        return -1;
+    }
+
+    pFrame = av_frame_alloc();
+    if (!pFrame) {
+        LOGD("Could not allocate video frame\n");
+        return -1;
+    }
+    pFrame->format = pCodecCtx->pix_fmt;
+    pFrame->width = pCodecCtx->width;
+    pFrame->height = pCodecCtx->height;
+
+    ret = av_image_alloc(pFrame->data, pFrame->linesize, pCodecCtx->width, pCodecCtx->height,
+                         pCodecCtx->pix_fmt, 16);
+    if (ret < 0) {
+        LOGD("Could not allocate raw picture buffer\n");
+        return -1;
+    }
+    //Input raw data
+    fp_in = fopen(filename_in, "rb");
+    if (!fp_in) {
+        LOGD("Could not open %s\n", filename_in);
+        return -1;
+    }
+    //Output bitstream
+    fp_out = fopen(filename_out, "wb");
+    if (!fp_out) {
+        LOGD("Could not open %s\n", filename_out);
+        return -1;
+    }
+
+    y_size = pCodecCtx->width * pCodecCtx->height;
+    //Encode
+    for (i = 0; i < framenum; i++) {
+        av_init_packet(&pkt);
+        pkt.data = NULL;    // packet data will be allocated by the encoder
+        pkt.size = 0;
+        //Read raw YUV data
+        if (fread(pFrame->data[0], 1, y_size, fp_in) <= 0 ||        // Y
+            fread(pFrame->data[1], 1, y_size / 4, fp_in) <= 0 ||    // U
+            fread(pFrame->data[2], 1, y_size / 4, fp_in) <= 0) {    // V
+            return -1;
+        } else if (feof(fp_in)) {
+            break;
+        }
+
+        pFrame->pts = i;
+        /* encode the image */
+        ret = avcodec_encode_video2(pCodecCtx, &pkt, pFrame, &got_output);
+        if (ret < 0) {
+            LOGD("Error encoding frame\n");
+            return -1;
+        }
+        if (got_output) {
+            LOGD("Succeed to encode frame: %5d\tsize:%5d\n", framecnt, pkt.size);
+            framecnt++;
+            fwrite(pkt.data, 1, pkt.size, fp_out);
+            av_free_packet(&pkt);
+        }
+    }
+    //Flush Encoder
+    for (got_output = 1; got_output; i++) {
+        ret = avcodec_encode_video2(pCodecCtx, &pkt, NULL, &got_output);
+        if (ret < 0) {
+            LOGD("Error encoding frame\n");
+            return -1;
+        }
+        if (got_output) {
+            LOGD("Flush Encoder: Succeed to encode 1 frame!\tsize:%5d\n", pkt.size);
+            fwrite(pkt.data, 1, pkt.size, fp_out);
+            av_free_packet(&pkt);
+        }
+    }
+
+    fclose(fp_out);
+    avcodec_close(pCodecCtx);
+    av_free(pCodecCtx);
+    av_freep(&pFrame->data[0]);
+    av_frame_free(&pFrame);
+
+    return 0;
+
+}
+
+
+void YuvtoMp42(JNIEnv *env, jobject /* this */, jstring filename_in, jstring filename_out) {
+    char *input_path = const_cast<char *>(env->GetStringUTFChars(filename_in, nullptr));
+    char *out_file = const_cast<char *>(env->GetStringUTFChars(filename_out, nullptr));
+    // 1.
+    AVFormatContext *avFormatContext = nullptr;
+
+    // 2.
+    AVCodecContext *avCodecContext = nullptr;
+
+    // 3.
+    AVOutputFormat *avOutputFormat = nullptr;
+
+    // 4.
+    AVCodec *avCodec = nullptr;
+
+    // 5.
+    AVStream *avStream = nullptr;
+
+    // 6.
+    AVFrame *avFrame = nullptr;
+
+    // 7.
+    AVPacket *avPacket = nullptr;
+
+    // 8.
+    uint8_t *frame_buf = nullptr;
+
+
+    int in_w = 480, in_h = 272;
+
+    int ret = -1;
+
+    // 1.
+    avcodec_register_all();
+    av_register_all();
+
+    // 2.
+    avformat_alloc_output_context2(&avFormatContext, nullptr, nullptr, out_file);
+
+    // 3.
+    avOutputFormat = avFormatContext->oformat;
+    LOGD("封裝格式name： %s", avOutputFormat->name);
+    LOGD("coder_id： %u", avOutputFormat->video_codec);
+
+
+
+
+    // 4.
+    if (avio_open(&avFormatContext->pb, out_file, AVIO_FLAG_READ_WRITE)) {
+        LOGD("output file open fail!")
+        return;
+    }
+
+//    for (int i = 0; i < avFormatContext->nb_streams; ++i) {
+//        LOGD("current stream id: %d", avFormatContext->streams[i]->id)
+//    }
+
+    // 5.
+    avStream = avformat_new_stream(avFormatContext, nullptr);
+    avStream->time_base.num = 1;
+    avStream->time_base.den = 25;
+
+    // 6.
+    avCodecContext = avStream->codec;
+    avCodecContext->codec_id = avOutputFormat->video_codec;
+    avCodecContext->codec_type = AVMEDIA_TYPE_VIDEO;
+    avCodecContext->pix_fmt = AV_PIX_FMT_YUV420P;
+    avCodecContext->width = in_w;
+    avCodecContext->height = in_h;
+    avCodecContext->time_base.num = 1;
+    avCodecContext->time_base.den = 25;
+    avCodecContext->bit_rate = 400000;
+    avCodecContext->gop_size = 10;
+
+
+
+    // 7.
+    avCodec = avcodec_find_encoder(avCodecContext->codec_id);
+    if (!avCodec) {
+        LOGD("encoder find error")
+        return;
+    }
+
+    // 8.
+    ret = avcodec_open2(avCodecContext, avCodec, nullptr);
+    if (ret < 0) {
+        LOGD("encoder open error %d", ret)
+        return;
+    }
+
+
+    av_dump_format(avFormatContext, 0, out_file, 1);
+
+    // 9.
+    avFrame = av_frame_alloc();
+    avFrame->width = avCodecContext->width;
+    avFrame->height = avCodecContext->height;
+    avFrame->format = avCodecContext->pix_fmt;
+
+
+    int size = av_image_get_buffer_size(avCodecContext->pix_fmt,
+                                        avCodecContext->width,
+                                        avCodecContext->height, 1);
+
+    frame_buf = static_cast<uint8_t *>(av_malloc(size));
+
+
+    av_image_fill_arrays(avFrame->data,
+                         avFrame->linesize,
+                         frame_buf,
+                         avCodecContext->pix_fmt,
+                         avCodecContext->width,
+                         avCodecContext->height, 1);
+
+
+    // 10.
+    avformat_write_header(avFormatContext, nullptr);
+
+    int y_size = avCodecContext->width * avCodecContext->height;
+//    av_new_packet(avPacket, size * 3);
+
+    avPacket = av_packet_alloc();
+    av_init_packet(avPacket);
+
+    // 11.
+    FILE *in_file = fopen(input_path, "rb");
+    if (!in_file) {
+        LOGD("can not open file!")
+        return;
+    }
+
+    // 12.
+    int i = 0;
+    while (true) {
+
+        if (fread(frame_buf, 1, y_size * 3 / 2, in_file) < 0) {
+            LOGD("read file fail!")
+            break;
+        } else if (feof(in_file)) {
+            break;
+        }
+
+        avFrame->data[0] = frame_buf; //亮度Y
+        avFrame->data[1] = frame_buf + y_size; //U
+        avFrame->data[2] = frame_buf + y_size * 5 / 4; //V
+        avFrame->linesize[0] = avFrame->width;// y数据的行宽
+        avFrame->linesize[1] = avFrame->width / 2;// u数据的行宽
+        avFrame->linesize[2] = avFrame->width / 2;// v数据的行宽
+
+        avFrame->pts = i;
+        i += 1;
+        // 13.
+        avcodec_send_frame(avCodecContext, avFrame);
+        while (true) {
+            int ret = avcodec_receive_packet(avCodecContext, avPacket);
+            if (ret) {
+                break;
+            }
+
+            av_packet_rescale_ts(avPacket, avCodecContext->time_base, avStream->time_base);
+            avPacket->stream_index = avStream->index;
+
+            // 将帧写入视频文件中，
+            // 与av_write_frame的区别是,将对 packet 进行缓存和 pts 检查。
+            av_interleaved_write_frame(avFormatContext, avPacket);
+
+        }
+
+    }
+
+
+    // 13.
+    avcodec_send_frame(avCodecContext, nullptr);
+    while (true) {
+        int ret = avcodec_receive_packet(avCodecContext, avPacket);
+        if (ret) {
+            av_packet_unref(avPacket);
+            break;
+        }
+        av_packet_rescale_ts(avPacket, avCodecContext->time_base, avStream->time_base);
+        avPacket->stream_index = avStream->index;
+
+        // 将对 packet 进行缓存和 pts 检查，这是区别于 av_write_frame 的地方。
+        av_interleaved_write_frame(avFormatContext, avPacket);
+    }
+
+
+    fclose(in_file);
+    avcodec_close(avCodecContext);
+    av_free(avFrame);
+    av_free(frame_buf);
+    av_free_packet(avPacket);
+    av_write_trailer(avFormatContext);
+    avio_close(avFormatContext->pb);
+    avformat_free_context(avFormatContext);
+}
+
+
+int flush_encoder(AVFormatContext *fmt_ctx, unsigned int stream_index) {
+    int ret;
+    int got_frame;
+    AVPacket enc_pkt;
+//    if (!(fmt_ctx->streams[stream_index]->codec->codec->capabilities && CODEC_CAP_DELAY))
+//        return 0;
+
+    while (1) {
+        printf("Flushing stream #%u encoder\n", stream_index);
+        enc_pkt.data = NULL;
+        enc_pkt.size = 0;
+        av_init_packet(&enc_pkt);
+        ret = avcodec_encode_video2(fmt_ctx->streams[stream_index]->codec, &enc_pkt,
+                                    NULL, &got_frame);
+        av_frame_free(NULL);
+        if (ret < 0)
+            break;
+        if (!got_frame) {
+            ret = 0;
+            break;
+        }
+        LOGD("success encoder 1 frame")
+
+        // parpare packet for muxing
+        enc_pkt.stream_index = stream_index;
+        av_packet_rescale_ts(&enc_pkt,
+                             fmt_ctx->streams[stream_index]->codec->time_base,
+                             fmt_ctx->streams[stream_index]->time_base);
+        ret = av_interleaved_write_frame(fmt_ctx, &enc_pkt);
+        if (ret < 0)
+            break;
+    }
+    return ret;
+}
+
+void YuvtoMp4(JNIEnv *env, jobject /* this */, jstring filename_in, jstring filename_out) {
+    char *input_path = const_cast<char *>(env->GetStringUTFChars(filename_in, nullptr));
+    char *out_file = const_cast<char *>(env->GetStringUTFChars(filename_out, nullptr));
+
+    AVFormatContext *pFormatCtx = nullptr;
+    AVOutputFormat *fmt = nullptr;
+    AVStream *video_st = nullptr;
+    AVCodecContext *pCodecCtx = nullptr;
+    AVCodec *pCodec = nullptr;
+
+    uint8_t *picture_buf = nullptr;
+    AVFrame *picture = nullptr;
+    int size;
+
+    //打开视频
+    FILE *in_file = fopen(input_path, "rb");
+    if (!in_file) {
+        LOGD("can not open file!")
+        return;
+    }
+
+    int in_w = 480, in_h = 272;
+    int framenum = 100;
+
+    //[1] --注册所有ffmpeg组件
+    avcodec_register_all();
+    av_register_all();
+    //[1]
+
+    //[2] --初始化AVFormatContext结构体,根据文件名获取到合适的封装格式
+    avformat_alloc_output_context2(&pFormatCtx, NULL, NULL, out_file);
+    fmt = pFormatCtx->oformat;
+    LOGD("封裝格式name： %s", fmt->name);
+    LOGD("coder_id： %u", fmt->video_codec);
+
+
+    //[2]
+
+    //[3] --打开文件
+    if (avio_open(&pFormatCtx->pb, out_file, AVIO_FLAG_READ_WRITE)) {
+        LOGD("output file open fail!")
+        return;
+    }
+    //[3]
+
+    //[4] --初始化视频码流
+    video_st = avformat_new_stream(pFormatCtx, 0);
+    if (video_st == NULL) {
+        LOGD("failed allocating output stram")
+
+        return;
+    }
+    video_st->time_base.num = 1;
+    video_st->time_base.den = 25;
+    //[4]
+
+    //[5] --编码器Context设置参数
+    pCodecCtx = video_st->codec;
+    pCodecCtx->codec_id = fmt->video_codec;
+    pCodecCtx->codec_type = AVMEDIA_TYPE_VIDEO;
+    pCodecCtx->pix_fmt = AV_PIX_FMT_YUV420P;
+    pCodecCtx->width = in_w;
+    pCodecCtx->height = in_h;
+    pCodecCtx->time_base.num = 1;
+    pCodecCtx->time_base.den = 25;
+    pCodecCtx->bit_rate = 400000;
+    pCodecCtx->gop_size = 10;
+
+    if (pCodecCtx->codec_id == AV_CODEC_ID_H264) {
+        pCodecCtx->qmin = 10;
+        pCodecCtx->qmax = 51;
+        pCodecCtx->qcompress = 0.6;
+    }
+
+    if (pCodecCtx->codec_id == AV_CODEC_ID_MPEG2VIDEO) {
+        pCodecCtx->max_b_frames = 2;
+    }
+
+    if (pCodecCtx->codec_id == AV_CODEC_ID_MPEG1VIDEO) {
+        pCodecCtx->mb_decision = 2;
+    }
+
+    //[5]
+
+    //[6] --寻找编码器并打开编码器
+    pCodec = avcodec_find_encoder(pCodecCtx->codec_id);
+    if (!pCodec) {
+        LOGD("no right encoder!")
+        return;
+    }
+    if (avcodec_open2(pCodecCtx, pCodec, NULL) < 0) {
+        LOGD("open encoder fail!")
+        return;
+    }
+    //[6]
+
+    //输出格式信息
+    av_dump_format(pFormatCtx, 0, out_file, 1);
+
+    //初始化帧
+    picture = av_frame_alloc();
+    picture->width = pCodecCtx->width;
+    picture->height = pCodecCtx->height;
+    picture->format = pCodecCtx->pix_fmt;
+    size = avpicture_get_size(pCodecCtx->pix_fmt, pCodecCtx->width, pCodecCtx->height);
+    picture_buf = (uint8_t *) av_malloc(size);
+    avpicture_fill((AVPicture *) picture, picture_buf, pCodecCtx->pix_fmt, pCodecCtx->width,
+                   pCodecCtx->height);
+
+    //[7] --写头文件
+    avformat_write_header(pFormatCtx, NULL);
+    //[7]
+
+    AVPacket pkt; //创建已编码帧
+    int y_size = pCodecCtx->width * pCodecCtx->height;
+    av_new_packet(&pkt, size * 3);
+
+    //[8] --循环编码每一帧
+    for (int i = 0; i < framenum; i++) {
+        //读入YUV
+        if (fread(picture_buf, 1, y_size * 3 / 2, in_file) < 0) {
+            LOGD("read file fail!")
+
+            return;
+        } else if (feof(in_file))
+            break;
+
+        picture->data[0] = picture_buf; //亮度Y
+        picture->data[1] = picture_buf + y_size; //U
+        picture->data[2] = picture_buf + y_size * 5 / 4; //V
+        //AVFrame PTS
+        picture->pts = i;
+        int got_picture = 0;
+
+        //编码
+        int ret = avcodec_encode_video2(pCodecCtx, &pkt, picture, &got_picture);
+        if (ret < 0) {
+            LOGD("encoder fail!")
+            return;
+        }
+
+        if (got_picture == 1) {
+            LOGD("encoder success!")
+
+            // parpare packet for muxing
+            pkt.stream_index = video_st->index;
+            av_packet_rescale_ts(&pkt, pCodecCtx->time_base, video_st->time_base);
+            pkt.pos = -1;
+            ret = av_interleaved_write_frame(pFormatCtx, &pkt);
+            av_free_packet(&pkt);
+        }
+    }
+    //[8]
+
+    //[9] --Flush encoder
+    int ret = flush_encoder(pFormatCtx, 0);
+    if (ret < 0) {
+        LOGD("flushing encoder failed!")
+
+        return;
+    }
+    //[9]
+
+    //[10] --写文件尾
+    av_write_trailer(pFormatCtx);
+    //[10]
+
+    end:
+    //释放内存
+    if (video_st) {
+        avcodec_close(video_st->codec);
+        av_free(picture);
+        av_free(picture_buf);
+    }
+    if (pFormatCtx) {
+        avio_close(pFormatCtx->pb);
+        avformat_free_context(pFormatCtx);
+    }
+
+    fclose(in_file);
+
+    return;
+}
+
+jint Mp4toYuv2(JNIEnv *env, jobject /* this */, jstring filename_in, jstring filename_out) {
+    char *input_url = const_cast<char *>(env->GetStringUTFChars(filename_in, nullptr));
+    char *output_url = const_cast<char *>(env->GetStringUTFChars(filename_out, nullptr));
+
+    // 1.
+    AVFormatContext *avFormatContext;
+    // 2.
+    AVCodecContext *avCodecContext;
+    // 3.
+    AVCodec *avCodec;
+    // 4.
+    AVPacket *avPacket = nullptr;
+    // 5.
+    AVFrame *avFrame = nullptr;
+    AVFrame *avFrameYUV = nullptr;
+
+    // 6.
+    SwsContext *swsContext;
+
+    FILE *fileYuv;
+
+
+    int ret = -1;
+
+    int videoindex = -1;
+
+    // 1.注册编解码器
+    av_register_all();
+
+
+    // 2.
+    avFormatContext = avformat_alloc_context();
+    // 3.
+    ret = avformat_open_input(&avFormatContext, input_url, nullptr, nullptr);
+    if (ret != 0) {
+        return -1;
+    }
+
+    // 3.
+    ret = avformat_find_stream_info(avFormatContext, nullptr);
+    if (ret < 0) {
+        return -1;
+    }
+
+
+    // 4.
+    for (int i = 0; i < avFormatContext->nb_streams; ++i) {
+//        if (avFormatContext->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+//            videoIndex = i;
+//            break;
+//        }
+        AVStream *stream = avFormatContext->streams[i];
+        AVCodecParameters *parameters = stream->codecpar;
+        AVMediaType mediaType = parameters->codec_type;
+        if (mediaType == AVMEDIA_TYPE_VIDEO) {
+
+            videoindex = i;
+
+            avCodec = avcodec_find_decoder(parameters->codec_id);
+
+            // 5.
+            avCodecContext = avcodec_alloc_context3(avCodec);
+            ret = avcodec_parameters_to_context(avCodecContext, parameters);
+            if (ret < 0) {
+                return -1;
+            }
+            break;
+        }
+    }
+
+    // 7.
+    ret = avcodec_open2(avCodecContext, avCodec, nullptr);
+    if (ret != 0) {
+        return -1;
+    }
+
+    // 8.
+    avPacket = av_packet_alloc();
+    avFrame = av_frame_alloc();
+    avFrameYUV = av_frame_alloc();
+
+
+    unsigned char *out_buffer = (unsigned char *) av_malloc(
+            av_image_get_buffer_size(AV_PIX_FMT_YUV420P, avCodecContext->width,
+                                     avCodecContext->height, 1));
+
+
+    av_image_fill_arrays(avFrameYUV->data,
+                         avFrameYUV->linesize,
+                         out_buffer,
+                         AV_PIX_FMT_YUV420P,
+                         avCodecContext->width,
+                         avCodecContext->height, 1);
+
+    swsContext = sws_getContext(avCodecContext->width, avCodecContext->height,
+                                avCodecContext->pix_fmt,
+                                avCodecContext->width, avCodecContext->height, AV_PIX_FMT_YUV420P,
+                                SWS_BICUBIC, nullptr, nullptr, nullptr);
+
+    fileYuv = fopen(output_url, "wb+");
+
+
+    // 9.
+    while (av_read_frame(avFormatContext, avPacket) >= 0) {
+        if (avPacket->stream_index == videoindex) {
+            // 10.
+            ret = avcodec_send_packet(avCodecContext, avPacket);
+            if (ret < 0) {
+                break;
+            }
+
+            while (true) {
+                // 11.
+                ret = avcodec_receive_frame(avCodecContext, avFrame);
+                if (ret) {
+                    break;
+                }
+                sws_scale(swsContext,
+                          avFrame->data, avFrame->linesize,
+                          0, avCodecContext->height,
+                          avFrameYUV->data, avFrameYUV->linesize);
+
+
+                int y_size = avCodecContext->width * avCodecContext->height;
+                fwrite(avFrameYUV->data[0], 1, y_size, fileYuv);    //Y
+                fwrite(avFrameYUV->data[1], 1, y_size / 4, fileYuv);  //U
+                fwrite(avFrameYUV->data[2], 1, y_size / 4, fileYuv);  //V
+            }
+
+        }
+
+
+    }
+
+    sws_freeContext(swsContext);
+
+    fclose(fileYuv);
+
+    av_frame_free(&avFrame);
+    av_frame_free(&avFrameYUV);
+    avcodec_close(avCodecContext);
+    avformat_close_input(&avFormatContext);
+
+
+    return 0;
+}
+
+jint Mp4toYuv(JNIEnv *env, jobject /* this */, jstring filename_in, jstring filename_out) {
+    char *input_url = const_cast<char *>(env->GetStringUTFChars(filename_in, nullptr));
+    char *output_url = const_cast<char *>(env->GetStringUTFChars(filename_out, nullptr));
+    AVFormatContext *pFormatCtx;
+    int i, videoindex;
+    AVCodecContext *pCodecCtx;
+    AVCodec *pCodec;
+    AVFrame *pFrame, *pFrameYUV;
+    uint8_t *out_buffer;
+    AVPacket *packet;
+    int y_size;
+    int ret, got_picture;
+    struct SwsContext *img_convert_ctx;
+    FILE *fp_yuv;
+    int frame_cnt;
+    clock_t time_start, time_finish;
+    double time_duration = 0.0;
+
+    char input_str[500] = {0};
+    char output_str[500] = {0};
+    char info[1000] = {0};
+
+
+    av_register_all();
+    avformat_network_init();
+    pFormatCtx = avformat_alloc_context();
+
+    if (avformat_open_input(&pFormatCtx, input_str, nullptr, nullptr) != 0) {
+        LOGE("Couldn't open input stream.\n");
+        return -1;
+    }
+    LOGD("视音频流的个数:%d", pFormatCtx->nb_streams);
+    if (avformat_find_stream_info(pFormatCtx, nullptr) < 0) {
+        LOGE("Couldn't find stream information.\n");
+        return -1;
+    }
+    videoindex = -1;
+    for (i = 0; i < pFormatCtx->nb_streams; i++) {
+        if (pFormatCtx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
+            videoindex = i;
+            break;
+        }
+    }
+
+
+    if (videoindex == -1) {
+        LOGE("Couldn't find a video stream.\n");
+        return -1;
+    }
+    pCodecCtx = pFormatCtx->streams[videoindex]->codec;
+    pCodec = avcodec_find_decoder(pCodecCtx->codec_id);
+    if (pCodec == NULL) {
+        LOGE("Couldn't find Codec.\n");
+        return -1;
+    }
+    if (avcodec_open2(pCodecCtx, pCodec, NULL) < 0) {
+        LOGE("Couldn't open codec.\n");
+        return -1;
+    }
+
+    pFrame = av_frame_alloc();
+    pFrameYUV = av_frame_alloc();
+    out_buffer = (unsigned char *) av_malloc(
+            av_image_get_buffer_size(AV_PIX_FMT_YUV420P, pCodecCtx->width, pCodecCtx->height, 1));
+
+    av_image_fill_arrays(pFrameYUV->data, pFrameYUV->linesize, out_buffer,
+                         AV_PIX_FMT_YUV420P, pCodecCtx->width, pCodecCtx->height, 1);
+
+    LOGD("width:%d, height:%d", pCodecCtx->width, pCodecCtx->height)
+
+
+    packet = (AVPacket *) av_malloc(sizeof(AVPacket));
+
+    img_convert_ctx = sws_getContext(pCodecCtx->width, pCodecCtx->height, pCodecCtx->pix_fmt,
+                                     pCodecCtx->width, pCodecCtx->height, AV_PIX_FMT_YUV420P,
+                                     SWS_BICUBIC, NULL, NULL, NULL);
+
+
+    sprintf(info, "[Input     ]%s\n", input_str);
+    sprintf(info, "%s[Output    ]%s\n", info, output_str);
+    sprintf(info, "%s[Format    ]%s\n", info, pFormatCtx->iformat->name);
+    sprintf(info, "%s[Codec     ]%s\n", info, pCodecCtx->codec->name);
+    sprintf(info, "%s[Resolution]%dx%d\n", info, pCodecCtx->width, pCodecCtx->height);
+
+
+    fp_yuv = fopen(output_str, "wb+");
+    if (fp_yuv == nullptr) {
+        printf("Cannot open output file.\n");
+        return -1;
+    }
+
+    frame_cnt = 0;
+    time_start = clock();
+
+    while (av_read_frame(pFormatCtx, packet) >= 0) {
+        if (packet->stream_index == videoindex) {
+            ret = avcodec_decode_video2(pCodecCtx, pFrame, &got_picture, packet);
+            if (ret < 0) {
+                LOGE("Decode Error.\n");
+                return -1;
+            }
+            if (got_picture) {
+                sws_scale(img_convert_ctx, (const uint8_t *const *) pFrame->data, pFrame->linesize,
+                          0, pCodecCtx->height,
+                          pFrameYUV->data, pFrameYUV->linesize);
+
+                y_size = pCodecCtx->width * pCodecCtx->height;
+                fwrite(pFrameYUV->data[0], 1, y_size, fp_yuv);    //Y
+                fwrite(pFrameYUV->data[1], 1, y_size / 4, fp_yuv);  //U
+                fwrite(pFrameYUV->data[2], 1, y_size / 4, fp_yuv);  //V
+                //Output info
+                char pictype_str[10] = {0};
+                switch (pFrame->pict_type) {
+                    case AV_PICTURE_TYPE_I:
+                        sprintf(pictype_str, "I");
+                        break;
+                    case AV_PICTURE_TYPE_P:
+                        sprintf(pictype_str, "P");
+                        break;
+                    case AV_PICTURE_TYPE_B:
+                        sprintf(pictype_str, "B");
+                        break;
+                    default:
+                        sprintf(pictype_str, "Other");
+                        break;
+                }
+                LOGI("Frame Index: %5d. Type:%s", frame_cnt, pictype_str);
+                frame_cnt++;
+            }
+        }
+        av_free_packet(packet);
+    }
+    //flush decoder
+    //FIX: Flush Frames remained in Codec
+    while (1) {
+        ret = avcodec_decode_video2(pCodecCtx, pFrame, &got_picture, packet);
+        if (ret < 0)
+            break;
+        if (!got_picture)
+            break;
+        sws_scale(img_convert_ctx, (const uint8_t *const *) pFrame->data, pFrame->linesize, 0,
+                  pCodecCtx->height,
+                  pFrameYUV->data, pFrameYUV->linesize);
+        int y_size = pCodecCtx->width * pCodecCtx->height;
+        fwrite(pFrameYUV->data[0], 1, y_size, fp_yuv);    //Y
+        fwrite(pFrameYUV->data[1], 1, y_size / 4, fp_yuv);  //U
+        fwrite(pFrameYUV->data[2], 1, y_size / 4, fp_yuv);  //V
+        //Output info
+        char pictype_str[10] = {0};
+        switch (pFrame->pict_type) {
+            case AV_PICTURE_TYPE_I:
+                sprintf(pictype_str, "I");
+                break;
+            case AV_PICTURE_TYPE_P:
+                sprintf(pictype_str, "P");
+                break;
+            case AV_PICTURE_TYPE_B:
+                sprintf(pictype_str, "B");
+                break;
+            default:
+                sprintf(pictype_str, "Other");
+                break;
+        }
+        LOGI("Frame Index: %5d. Type:%s", frame_cnt, pictype_str);
+        frame_cnt++;
+    }
+    time_finish = clock();
+    time_duration = (double) (time_finish - time_start);
+
+    sprintf(info, "%s[Time      ]%fms\n", info, time_duration);
+    sprintf(info, "%s[Count     ]%d\n", info, frame_cnt);
+
+    sws_freeContext(img_convert_ctx);
+
+    fclose(fp_yuv);
+
+    av_frame_free(&pFrameYUV);
+    av_frame_free(&pFrame);
+    avcodec_close(pCodecCtx);
+    avformat_close_input(&pFormatCtx);
+
+    return 0;
+}
+
+static const JNINativeMethod dynamicMethods[] = {
+        {"native_helloFFmpeg",     "()Ljava/lang/String;",                    (jstring *) helloFFmpeg},
+
+        {"native_Mp4toYuv",        "(Ljava/lang/String;Ljava/lang/String;)I", (jint *) Mp4toYuv},
+        {"native_Mp4toYuv",        "(Ljava/lang/String;Ljava/lang/String;)I", (jint *) Mp4toYuv2},
+
+        {"native_yuv2mp4",         "(Ljava/lang/String;Ljava/lang/String;)V", (void *) YuvtoMp4},
+        {"native_yuv2mp42",        "(Ljava/lang/String;Ljava/lang/String;)V", (void *) YuvtoMp42},
+
+        {"native_yuvToH264",       "(Ljava/lang/String;Ljava/lang/String;)I", (jint *) yuvToH264},
+        {"native_yuvToH264Second", "(Ljava/lang/String;Ljava/lang/String;)V", (void *) yuvToH264Second},
+
+        {"native_h264Toyuv",       "(Ljava/lang/String;Ljava/lang/String;)V", (void *) h264Toyuv},
+        {"native_h264Toyuv2",      "(Ljava/lang/String;Ljava/lang/String;)V", (void *) h264Toyuv2},
+        {"native_mp3Topcm",        "(Ljava/lang/String;Ljava/lang/String;)V", (void *) mp3Topcm},
+        {"native_mp3Topcm2",       "(Ljava/lang/String;Ljava/lang/String;)V", (void *) mp3Topcm2},
+        {"native_pcm2mp3",         "(Ljava/lang/String;Ljava/lang/String;)V", (void *) pcm2mp3},
+        {"native_pcm2aac",         "(Ljava/lang/String;Ljava/lang/String;)V", (void *) pcm2aac},
+        {"native_pcm2aacSecond",         "(Ljava/lang/String;Ljava/lang/String;)V", (void *) pcm2aacSecond},
+
+
+};
+
+// 动态注册
+static int registerNativeMethods(JNIEnv *env, const char *className) {
+    jclass clazz = env->FindClass(className);
+    if (clazz == nullptr) {
+        return JNI_FALSE;
+    }
+    if (env->RegisterNatives(clazz, dynamicMethods, NELEM(dynamicMethods)) < 0) {
+        return JNI_FALSE;
+    }
+    return JNI_TRUE;
+}
+
+jint JNI_OnLoad(JavaVM *jvm, void *) {
+    JNIEnv *env = NULL;
+    if (jvm->GetEnv((void **) &env, JNI_VERSION_1_6)) {
+        return JNI_ERR;
+    }
+
+    if (registerNativeMethods(env, "com/example/ffmpegstudy/MainActivity") != 1) {
+        return JNI_ERR;
+    }
+
+    return JNI_VERSION_1_6;
+}
+===================================  C语言  =================================
+
+
+===================================  java语言  =================================
+
+package com.example.ffmpegstudy;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import android.os.Bundle;
+import android.os.Environment;
+import android.widget.TextView;
+
+import com.example.ffmpegstudy.databinding.ActivityMainBinding;
+
+public class MainActivity extends AppCompatActivity {
+
+    // Used to load the 'ffmpegstudy' library on application startup.
+    static {
+        System.loadLibrary("ffmpegstudy");
+    }
+
+
+    private String input = Environment.getExternalStorageDirectory().getPath() + "/AAAA/input.mp4";
+    private String output = Environment.getExternalStorageDirectory().getPath() + "/AAAA/output.yuv";
+
+
+    private String input_yuv = Environment.getExternalStorageDirectory().getPath() + "/AAAA/output.yuv";
+    private String output_mp4 = Environment.getExternalStorageDirectory().getPath() + "/AAAA/output_yuv.mp4";
+
+
+    private String input_h264 = Environment.getExternalStorageDirectory().getPath() + "/AAAA/ds_480x272.yuv";
+    private String output_h264 = Environment.getExternalStorageDirectory().getPath() + "/AAAA/output_ds.h264";
+
+
+    private String input_h264_yuv = Environment.getExternalStorageDirectory().getPath() + "/AAAA/output_ds.h264";
+    private String output_h264_yuv = Environment.getExternalStorageDirectory().getPath() + "/AAAA/h264_yuv.yuv";
+
+
+    private String input_mp3 = Environment.getExternalStorageDirectory().getPath() + "/AAAA/wait.mp3";
+    private String output_pcm = Environment.getExternalStorageDirectory().getPath() + "/AAAA/output.pcm";
+
+    private String output_chong = Environment.getExternalStorageDirectory().getPath() + "/AAAA/output_chong.pcm";
+
+    private String outputmp3 = Environment.getExternalStorageDirectory().getPath() + "/AAAA/outputmp3.mp3";
+
+    private String outputaac = Environment.getExternalStorageDirectory().getPath() + "/AAAA/outputaac.aac";
+
+    private ActivityMainBinding binding;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
+
+        binding.btnMp4toYuv.setOnClickListener(v -> {
+            native_Mp4toYuv(input, output);
+
+        });
+
+        binding.btnYuv2Mp4.setOnClickListener(v -> {
+            native_yuv2mp4(output_h264_yuv, output_mp4);
+        });
+
+        binding.btnYuvToH264.setOnClickListener(v -> {
+            native_yuvToH264Second(input_h264, output_h264);
+
+        });
+
+        binding.btnH264ToYuv.setOnClickListener(v -> {
+            native_h264Toyuv(input_h264_yuv, output_h264_yuv);
+        });
+
+        binding.btnMP3toPcm.setOnClickListener(v -> {
+            native_mp3Topcm2(input_mp3, output_chong);
+        });
+
+        binding.btnPcmtoMP3.setOnClickListener(v -> {
+            native_pcm2mp3(output_chong, outputmp3);
+        });
+
+        binding.btnPcmtoAAC.setOnClickListener(v -> {
+            native_pcm2aacSecond(output_chong, outputaac);
+        });
+    }
+
+    /**
+     * A native method that is implemented by the 'ffmpegstudy' native library,
+     * which is packaged with this application.
+     */
+    public native String native_helloFFmpeg();
+
+    public native int native_Mp4toYuv(String input, String output);
+
+    public native void native_yuv2mp4(String input, String output);
+
+    public native void native_yuv2mp42(String input, String output);
+
+    public native int native_yuvToH264(String input, String output);
+
+    public native void native_yuvToH264Second(String input, String output);
+
+    public native void native_h264Toyuv(String input, String output);
+    public native void native_h264Toyuv2(String input, String output);
+
+    public native void native_mp3Topcm(String input, String output);
+    public native void native_mp3Topcm2(String input, String output);
+
+    public native void native_pcm2mp3(String input, String output);
+
+    public native void native_pcm2aac(String input, String output);
+    public native void native_pcm2aacSecond(String input, String output);
+
+
+}
+
+===================================  java语言  =================================
