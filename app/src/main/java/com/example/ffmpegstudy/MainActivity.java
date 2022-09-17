@@ -51,6 +51,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         new Thread(new Runnable() {
             @Override
             public void run() {
+//                native_play(surfaceHolder.getSurface());
                 native_playVideo("/data/data/com.example.ffmpegstudy/cache/testvideo1.mp4", surfaceHolder.getSurface());
             }
         }).start();
@@ -76,4 +77,5 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     public native void native_playVideo(String url, Surface surfaceView);
     public native int native_Mp4toYuv(String input, String output);
 
+    public native int native_play(Surface surfaceView);
 }

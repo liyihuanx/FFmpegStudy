@@ -104,16 +104,16 @@ void FFmpegPlayer::prepare(char *data) {
     // 2.新建rgb的帧
     frame_rgb = av_frame_alloc();
     // 3.获取，填充rgb buffer
-    int bufferSize = av_image_get_buffer_size(AV_PIX_FMT_ARGB, video_width, video_height, 1);
+    int bufferSize = av_image_get_buffer_size(AV_PIX_FMT_RGBA, video_width, video_height, 1);
     frame_rgb_buffer = static_cast<uint8_t *>(av_malloc(bufferSize * sizeof(uint8_t)));
     // 4. 怎么解释呢
     av_image_fill_arrays(frame_rgb->data, frame_rgb->linesize,
-                         frame_rgb_buffer, AV_PIX_FMT_ARGB,
+                         frame_rgb_buffer, AV_PIX_FMT_RGBA,
                          video_width, video_height, 1);
 
     // 5. 获取转换上下文
     sws_context = sws_getContext(av_codec_ctx->width, av_codec_ctx->height, av_codec_ctx->pix_fmt,
-                                 av_codec_ctx->width, av_codec_ctx->height, AV_PIX_FMT_ARGB,
+                                 av_codec_ctx->width, av_codec_ctx->height, AV_PIX_FMT_RGBA,
                                  SWS_FAST_BILINEAR, NULL, NULL, NULL
     );
     LOGD("渲染准备")
@@ -123,7 +123,7 @@ void FFmpegPlayer::prepare(char *data) {
     ANativeWindow_setBuffersGeometry(native_window, video_width, video_height,
                                      WINDOW_FORMAT_RGBA_8888);
     // 2.准备一个渲染buffer
-    ANativeWindow_Buffer *windowBuffer = nullptr;
+    ANativeWindow_Buffer windowBuffer;
     LOGD("开始工作")
     // 开始工作
     // 1. 创建 存放解码后的数据frame 和 存放编码数据packet
@@ -152,19 +152,24 @@ void FFmpegPlayer::prepare(char *data) {
                 LOGD("渲染开始")
                 // 6.渲染开始
                 // 6.1 锁定Windows
-                ANativeWindow_lock(native_window, windowBuffer, nullptr);
+                ANativeWindow_lock(native_window, &windowBuffer, nullptr);
+
                 LOGD("锁定出错")
-                // 6.2
-                uint8_t *dstBuffer = static_cast<uint8_t *>(windowBuffer->bits);
+                // 6.2 源头的bit像素
+                uint8_t *dst = static_cast<uint8_t *>(windowBuffer.bits);
                 // 6.3 输入图的步长，一行像素有多少个字节
+                int dstLineSize = windowBuffer.stride * 4;
+
+                // 6.4 目标
+                uint8_t *src = frame_rgb->data[0];
                 int srcLineSize = frame_rgb->linesize[0];
-                // 6.4 RGBA 缓冲区步长
-                int dstLineSize = windowBuffer->stride * 4;
+
                 // 6.5 一行行拷贝
                 for (int i = 0; i < video_height; ++i) {
                     // 源数据 ---> 目标数据（字节对齐）
-                    memcpy(dstBuffer + i * dstLineSize,
-                           frame_rgb_buffer + i * srcLineSize,
+                    // 第一个像素开始，每次复制srcLineSize这么多
+                    memcpy(dst + i * dstLineSize,
+                           src + i * srcLineSize,
                            srcLineSize);
                 }
 
