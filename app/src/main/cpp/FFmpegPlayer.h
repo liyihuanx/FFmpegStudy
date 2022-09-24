@@ -17,7 +17,6 @@ extern "C" {
 #include <android/native_window_jni.h>
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
-#include "error.h"
 
 class FFmpegPlayer {
 private:
