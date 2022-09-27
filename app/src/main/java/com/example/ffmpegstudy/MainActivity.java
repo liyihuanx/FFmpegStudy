@@ -35,12 +35,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        binding.helloFFmpeg.setOnClickListener(v -> {
-            String str = native_helloFFmpeg();
-            native_Mp4toYuv("/data/data/com.example.ffmpegstudy/cache/testvideo1.mp4", "/data/data/com.example.ffmpegstudy/cache/testvideo1.yuv");
-
-        });
-
         holder = binding.sfView.getHolder();
         holder.addCallback(this);
 
@@ -76,6 +70,4 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     public native void native_playVideo(String url, Surface surfaceView);
     public native int native_Mp4toYuv(String input, String output);
-
-    public native int native_play(Surface surfaceView);
 }

@@ -11,12 +11,12 @@
 
 class SafeQueue {
 public:
-    int getAvPacket(T *avPacket);
-    int setAvPacket(AVPacket *avPacket);
-
-    queue<T> queue;
-    pthread_mutex_t mutex; // 互斥锁 安全
-    pthread_cond_t cond; // 等待 和 唤醒
+//    int getAvPacket(T *avPacket);
+//    int setAvPacket(AVPacket *avPacket);
+//
+//    queue<T> queue;
+//    pthread_mutex_t mutex; // 互斥锁 安全
+//    pthread_cond_t cond; // 等待 和 唤醒
 
 };
 

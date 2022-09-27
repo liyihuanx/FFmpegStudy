@@ -3,9 +3,15 @@ cmake_minimum_required(VERSION 3.10.2)
 project("ffmpegstudy")
 
 # 批量导入
-file(GLOB AllCPP ${CMAKE_SOURCE_DIR}/cpp/*.c
+file(GLOB AllCPP
+        ${CMAKE_SOURCE_DIR}/cpp/*.c
         ${CMAKE_SOURCE_DIR}/cpp/*.h
-        ${CMAKE_SOURCE_DIR}/cpp/*.cpp)
+        ${CMAKE_SOURCE_DIR}/cpp/*.cpp
+        ${CMAKE_SOURCE_DIR}/cpp/decoder/*.h
+        ${CMAKE_SOURCE_DIR}/cpp/decoder/*.cpp
+        ${CMAKE_SOURCE_DIR}/cpp/render/*.h
+        ${CMAKE_SOURCE_DIR}/cpp/render/*.cpp
+        )
 
 add_library(
         ffmpegstudy
