@@ -6,7 +6,17 @@
 #define FFMPEGSTUDY_VIDEODECODER_H
 
 
-class VideoDecoder {
+#include "BaseDecoder.h"
+
+class VideoDecoder : public BaseDecoder{
+
+public:
+    VideoDecoder(char *url) {
+        onCreate(url,AVMEDIA_TYPE_AUDIO);
+    }
+    virtual ~VideoDecoder() {
+        onDestroy();
+    }
 
 };
 

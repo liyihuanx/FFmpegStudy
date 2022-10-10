@@ -14,40 +14,59 @@ extern "C" {
 };
 
 #include "../log4c.h"
+#include <thread>
+
+using namespace std;
+
 
 class BaseDecoder {
+
+private:
+    // ffmpeg上下文
+    AVFormatContext *avFormatContext = nullptr;
+    // 解码器上下文
+    AVCodecContext *avCodecContext = nullptr;
+    // 解码器
+    AVCodec *avCodec = nullptr;
+    // 解码后的原始帧
+    AVFrame *frame = nullptr;
+    // 解码前的数据帧
+    AVPacket *packet = nullptr;
+
+
+    // 音视频数据
+    char *data_source = nullptr;
+    // 数据流的类型
+    AVMediaType avMediaType = AVMEDIA_TYPE_UNKNOWN;
+    // 音视频流的下标
+    int stream_index = -1;
 
 public:
     BaseDecoder();
     virtual ~BaseDecoder();
 
 
-private:
-    AVFormatContext *avFormatContext = nullptr;
-
-    AVCodecContext *avCodecContext = nullptr;
-
-    AVCodec *avCodec = nullptr;
-
-    AVFrame *frame = nullptr;
-
-    AVPacket *packet = nullptr;
-
-
-    // 音视频数据
-    char *data_source = nullptr;
-
-    int video_stream = -1;
-    int audio_stream = -1;
-
-public:
-    virtual void onCreate(char* url);
+    // 初始化Decoder（audio,video）
+    virtual void onCreate(char *url, AVMediaType mediaType);
+    // 释放Decoder以及参数
     virtual void onDestroy();
 
+    // 给player调用
+    void start();
+
+
 private:
-    int initFFmpegCtx();
-    int initDecoder();
-    int startDecoder();
+    // 初始化ffmpeg上下文
+    int initFFmpegEnvironment();
+
+    // 初始化video/audio解码器
+    virtual int initDecoder();
+
+    virtual int startDecoder();
+
+    virtual int releaseDecoder();
+    // 线程函数
+    static void startDecodeTread(BaseDecoder *decoder);
 };
 
 
