@@ -5,9 +5,19 @@
 #ifndef FFMPEGSTUDY_AUDIODECODER_H
 #define FFMPEGSTUDY_AUDIODECODER_H
 
+#include "BaseDecoder.h"
 
-class AudioDecoder {
+class AudioDecoder : public BaseDecoder{
+public:
+    AudioDecoder(char *url) {
+        onCreate(url,AVMEDIA_TYPE_AUDIO);
+    }
+    virtual ~AudioDecoder() {
+        onDestroy();
+    }
 
+
+    virtual int initDecoder();
 };
 
 

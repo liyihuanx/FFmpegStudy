@@ -34,7 +34,7 @@ void BaseDecoder::startDecodeTread(BaseDecoder *decoder) {
     }
 
     // 初始化解码环境
-    decoder->initDecoder();
+    decoder->initDecoderEnvironment();
 
     // 开始循环解码
     decoder->startDecoder();
@@ -109,15 +109,22 @@ int BaseDecoder::initFFmpegEnvironment() {
 
 
 int BaseDecoder::startDecoder() {
-    LOGD("releaseDecoder");
+    LOGD("startDecoder");
 
-    end:
+
+
+
+end:
     return -1;
 }
 
 int BaseDecoder::releaseDecoder() {
     LOGD("releaseDecoder");
     return 0;
+}
+
+AVCodecContext *BaseDecoder::getCodecContext() {
+    return avCodecContext;
 }
 
 

@@ -41,32 +41,45 @@ private:
     // 音视频流的下标
     int stream_index = -1;
 
+    // 锁和条件变量
+    mutex decode_mutex;
+    condition_variable decode_cond;
+    thread *decode_thread = nullptr;
+
 public:
     BaseDecoder();
+
     virtual ~BaseDecoder();
 
 
     // 初始化Decoder（audio,video）
     virtual void onCreate(char *url, AVMediaType mediaType);
+
     // 释放Decoder以及参数
     virtual void onDestroy();
 
     // 给player调用
     void start();
 
+    // 获取codec上下文
+    AVCodecContext *getCodecContext();
 
 private:
     // 初始化ffmpeg上下文
     int initFFmpegEnvironment();
 
-    // 初始化video/audio解码器
-    virtual int initDecoder();
+    // 初始化video/audio解码器要使用的配置
+    virtual void initDecoderEnvironment();
 
     virtual int startDecoder();
 
     virtual int releaseDecoder();
+
     // 线程函数
     static void startDecodeTread(BaseDecoder *decoder);
+
+    virtual void OnFrameAvailable(AVFrame *frame) = 0;
+
 };
 
 

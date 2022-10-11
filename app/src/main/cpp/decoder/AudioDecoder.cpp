@@ -3,3 +3,7 @@
 //
 
 #include "AudioDecoder.h"
+
+int AudioDecoder::initDecoder() {
+
+}
