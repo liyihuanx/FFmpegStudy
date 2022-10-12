@@ -13,15 +13,24 @@ class VideoDecoder : public BaseDecoder {
 
 public:
     VideoDecoder(char *url) {
-        onCreate(url, AVMEDIA_TYPE_AUDIO);
+        LOGD("VideoDecoder")
+        onCreate(url, AVMEDIA_TYPE_VIDEO);
     }
 
     virtual ~VideoDecoder() {
+        LOGD("~VideoDecoder")
         onDestroy();
     }
 
+    void SetVideoRender(BaseRender *render) {
+        videoRender = render;
+    }
+
+private:
     virtual void initDecoderEnvironment();
-    virtual void OnFrameAvailable(AVFrame *frame);
+
+    virtual void onFrameAvailable(AVFrame *frame);
+
 
 private:
     int video_height;
@@ -30,7 +39,7 @@ private:
     AVFrame *frame_rgb = nullptr;
     uint8_t *frame_rgb_buffer = nullptr;
     SwsContext *videoSwsCtx = nullptr;
-    BaseRender *baseRender = nullptr;
+    BaseRender *videoRender = nullptr;
 };
 
 

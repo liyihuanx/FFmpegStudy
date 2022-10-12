@@ -7,10 +7,8 @@ file(GLOB AllCPP
         ${CMAKE_SOURCE_DIR}/cpp/*.c
         ${CMAKE_SOURCE_DIR}/cpp/*.h
         ${CMAKE_SOURCE_DIR}/cpp/*.cpp
-        ${CMAKE_SOURCE_DIR}/cpp/decoder/*.h
-        ${CMAKE_SOURCE_DIR}/cpp/decoder/*.cpp
-        ${CMAKE_SOURCE_DIR}/cpp/render/*.h
-        ${CMAKE_SOURCE_DIR}/cpp/render/*.cpp
+        ${CMAKE_SOURCE_DIR}/cpp/*/*.h
+        ${CMAKE_SOURCE_DIR}/cpp/*/*.cpp
         )
 
 add_library(
@@ -56,4 +54,5 @@ target_link_libraries(
         z # libz.so库，是FFmpeg需要用ndk的z库，FFMpeg需要额外支持  libz.so
         android # ANativeWindow 用来渲染画面的
         OpenSLES # OpenSLES 用来播放声音的
+
 )

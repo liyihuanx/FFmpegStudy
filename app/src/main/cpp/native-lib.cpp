@@ -64,8 +64,14 @@ JNIEXPORT void JNICALL
 Java_com_example_ffmpegstudy_MainActivity_native_1playVideo(JNIEnv *env, jobject thiz, jstring url,
                                                             jobject surface_view) {
     char *dataSource = const_cast<char *>(env->GetStringUTFChars(url, nullptr));
+
+    LOGD("Play_Video")
+    auto *fFmpegPlayer = new FFmpegPlayer();
+    fFmpegPlayer->init(env,thiz,dataSource,surface_view);
+
     // 释放掉
     env->ReleaseStringUTFChars(url, dataSource);
+
 
 }
 

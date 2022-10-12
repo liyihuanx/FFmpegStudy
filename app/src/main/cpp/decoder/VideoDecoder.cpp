@@ -35,9 +35,13 @@ void VideoDecoder::initDecoderEnvironment() {
 }
 
 // 做格式转换
-void VideoDecoder::OnFrameAvailable(AVFrame *frame) {
-    LOGD("VideoDecoder::OnFrameAvailable()");
+void VideoDecoder::onFrameAvailable(AVFrame *frame) {
     // 从packet解码出来的frame(YUV原始帧)
+    LOGD("VideoDecoder::onFrameAvailable frame=%p", frame);
+
+
+
+
 
     // 1.转换格式
     // 2.给render渲染

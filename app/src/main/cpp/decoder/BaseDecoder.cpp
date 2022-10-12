@@ -22,14 +22,16 @@ void BaseDecoder::onDestroy() {
 }
 
 void BaseDecoder::start() {
-
+    LOGD("BaseDecoder::start()")
     new thread(startDecodeTread, this);
 }
 
 
 void BaseDecoder::startDecodeTread(BaseDecoder *decoder) {
+    LOGD("BaseDecoder::startDecodeTread");
     // 初始化上下文环境
-    if (decoder->initFFmpegEnvironment() < 0) {
+    if (decoder->initFFmpegEnvironment() != 0) {
+        LOGD("decoder->initFFmpegEnvironment() error")
         return;
     }
 
@@ -44,10 +46,11 @@ void BaseDecoder::startDecodeTread(BaseDecoder *decoder) {
 }
 
 int BaseDecoder::initFFmpegEnvironment() {
-    int ret = 0;
+    int ret = -1;
     // 1.
     avFormatContext = avformat_alloc_context();
 
+    LOGD("data_source: %s", data_source)
     // 2.
     ret = avformat_open_input(&avFormatContext, data_source, nullptr, nullptr);
     if (ret != 0) {
@@ -65,7 +68,7 @@ int BaseDecoder::initFFmpegEnvironment() {
     // 4. 在onCreate记录了mediatype
     for (int i = 0; i < avFormatContext->nb_streams; ++i) {
         AVMediaType codec_type = avFormatContext->streams[i]->codecpar->codec_type;
-        if (avFormatContext->streams[i]->codecpar->codec_type == avMediaType) {
+        if (codec_type == avMediaType) {
             stream_index = i;
             break;
         }
@@ -85,8 +88,8 @@ int BaseDecoder::initFFmpegEnvironment() {
         goto end;
     }
 
-    ret = avcodec_parameters_from_context(avFormatContext->streams[stream_index]->codecpar,
-                                          avCodecContext);
+    ret = avcodec_parameters_to_context(avCodecContext,
+                                        avFormatContext->streams[stream_index]->codecpar);
     if (ret < 0) {
         LOGD("avcodec_parameters_to_context error=%s", av_err2str(ret));
         goto end;
@@ -94,7 +97,7 @@ int BaseDecoder::initFFmpegEnvironment() {
 
     // 7.
     ret = avcodec_open2(avCodecContext, avCodec, nullptr);
-    if (ret != 0) {
+    if (ret < 0) {
         LOGD("avcodec_open2 ret=%d, error=%s", ret, av_err2str(ret));
         goto end;
     }
@@ -103,28 +106,78 @@ int BaseDecoder::initFFmpegEnvironment() {
 
     packet = av_packet_alloc();
 
+    // 顺利走到这则说明ok
+    ret = 0;
+
     end:
-    return -1;
+    return ret;
 }
 
 
-int BaseDecoder::startDecoder() {
-    LOGD("startDecoder");
+// 开始解码工作
+void BaseDecoder::startDecoder() {
+    LOGD("startDecoder MediaType=%d", avMediaType);
 
+    if (decodeOnePacket() != 0) {
+        // 解码结束
 
+    }
 
-
-end:
-    return -1;
 }
 
-int BaseDecoder::releaseDecoder() {
+int BaseDecoder::decodeOnePacket() {
+    LOGD("decodeOnePacket");
+
+    int result = -1;
+    //
+    while (av_read_frame(avFormatContext, packet) == 0) {
+        if (packet->stream_index == stream_index) {
+            if (avcodec_send_packet(avCodecContext, packet) == AVERROR_EOF) {
+                //解码结束
+                goto end;
+            }
+
+//            int frameCount = 0;
+            // 获取到YUV帧
+            while (avcodec_receive_frame(avCodecContext, frame) >= 0) {
+                // 更新时间戳
+
+                // 同步
+
+                // 渲染
+                onFrameAvailable(frame);
+//                frameCount++;
+            }
+
+            //判断一个 packet 是否解码完成 ???
+//            if (frameCount > 0) {
+//                result = 0;
+//                goto end;
+//            }
+        }
+        av_packet_unref(packet);
+    }
+
+
+    end:
+    av_packet_unref(packet);
+    return result;
+}
+
+
+// 释放解码相关变量
+void BaseDecoder::releaseDecoder() {
     LOGD("releaseDecoder");
-    return 0;
+
 }
 
 AVCodecContext *BaseDecoder::getCodecContext() {
     return avCodecContext;
+}
+
+// 改变播放状态
+void BaseDecoder::changeMediaStatus(int status) {
+
 }
 
 

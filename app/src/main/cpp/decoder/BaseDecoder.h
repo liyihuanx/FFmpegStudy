@@ -51,34 +51,40 @@ public:
 
     virtual ~BaseDecoder();
 
-
-    // 初始化Decoder（audio,video）
-    virtual void onCreate(char *url, AVMediaType mediaType);
-
-    // 释放Decoder以及参数
-    virtual void onDestroy();
-
     // 给player调用
     void start();
 
     // 获取codec上下文
     AVCodecContext *getCodecContext();
 
+protected:
+    // 初始化Decoder（audio,video）
+    void onCreate(char *url, AVMediaType mediaType);
+
+    // 释放Decoder以及参数
+    void onDestroy();
+
 private:
+
     // 初始化ffmpeg上下文
     int initFFmpegEnvironment();
 
     // 初始化video/audio解码器要使用的配置
-    virtual void initDecoderEnvironment();
+    virtual void initDecoderEnvironment() = 0;
 
-    virtual int startDecoder();
+    void startDecoder();
 
-    virtual int releaseDecoder();
+    virtual void releaseDecoder();
+
+    void changeMediaStatus(int status);
+
+    int decodeOnePacket();
+
 
     // 线程函数
     static void startDecodeTread(BaseDecoder *decoder);
 
-    virtual void OnFrameAvailable(AVFrame *frame) = 0;
+    virtual void onFrameAvailable(AVFrame *frame) = 0;
 
 };
 
