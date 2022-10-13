@@ -9,9 +9,9 @@
 #include <android/native_window.h>
 #include <android/native_window_jni.h>
 #include <jni.h>
-#include "BaseRender.h"
+#include "BaseVideoRender.h"
 
-class ANativeRender : public BaseRender {
+class ANativeRender : public BaseVideoRender {
 public:
     ANativeRender(JNIEnv *env, jobject surface);
 

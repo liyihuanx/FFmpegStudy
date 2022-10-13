@@ -7,7 +7,7 @@
 
 
 #include "BaseDecoder.h"
-#include "../render/BaseRender.h"
+#include "../render/BaseVideoRender.h"
 
 class VideoDecoder : public BaseDecoder {
 
@@ -22,7 +22,7 @@ public:
         onDestroy();
     }
 
-    void SetVideoRender(BaseRender *render) {
+    void setVideoRender(BaseVideoRender *render) {
         videoRender = render;
     }
 
@@ -31,6 +31,7 @@ private:
 
     virtual void onFrameAvailable(AVFrame *frame);
 
+    virtual void releaseDecoder();
 
 private:
     int video_height;
@@ -39,7 +40,7 @@ private:
     AVFrame *frame_rgb = nullptr;
     uint8_t *frame_rgb_buffer = nullptr;
     SwsContext *videoSwsCtx = nullptr;
-    BaseRender *videoRender = nullptr;
+    BaseVideoRender *videoRender = nullptr;
 };
 
 

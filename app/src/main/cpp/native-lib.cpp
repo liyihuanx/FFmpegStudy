@@ -67,7 +67,7 @@ Java_com_example_ffmpegstudy_MainActivity_native_1playVideo(JNIEnv *env, jobject
 
     LOGD("Play_Video")
     auto *fFmpegPlayer = new FFmpegPlayer();
-    fFmpegPlayer->init(env,thiz,dataSource,surface_view);
+    fFmpegPlayer->init(env, thiz, dataSource, surface_view);
 
     // 释放掉
     env->ReleaseStringUTFChars(url, dataSource);

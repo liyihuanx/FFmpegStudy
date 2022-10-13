@@ -165,12 +165,6 @@ int BaseDecoder::decodeOnePacket() {
 }
 
 
-// 释放解码相关变量
-void BaseDecoder::releaseDecoder() {
-    LOGD("releaseDecoder");
-
-}
-
 AVCodecContext *BaseDecoder::getCodecContext() {
     return avCodecContext;
 }

@@ -11,6 +11,9 @@ extern "C" {
 #include "libavcodec/avcodec.h"
 #include "libswscale/swscale.h"
 #include <libswresample/swresample.h>
+#include <libavutil/samplefmt.h>
+#include <libavutil/opt.h>
+#include <libavutil/audio_fifo.h>
 };
 
 #include "../log4c.h"
@@ -74,7 +77,7 @@ private:
 
     void startDecoder();
 
-    virtual void releaseDecoder();
+    virtual void releaseDecoder() = 0;
 
     void changeMediaStatus(int status);
 

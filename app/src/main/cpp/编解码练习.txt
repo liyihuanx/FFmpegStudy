@@ -2429,7 +2429,8 @@ public class MainActivity extends AppCompatActivity {
         // 假设：来源：10个48000   ---->  目标: 11个44100（10个不够，就向上取）
         int dst_nb_samples = av_rescale_rnd(
                 // 获取下一个输入样本相对于下一个输出样本将经历的延迟
-                swr_get_delay(player->swr_ctx, player->frame->sample_rate) + player->frame->nb_samples,
+                swr_get_delay(player->swr_ctx,
+                player->frame->sample_rate) + player->frame->nb_samples,
                 player->out_sample_rate, // 输出采样率（44100）
                 player->frame->sample_rate, // 输入采样率（音频的输入采样率，假设48000）
                 AV_ROUND_UP // 先上取 取去11个才能容纳的上

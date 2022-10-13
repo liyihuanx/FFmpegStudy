@@ -2,8 +2,8 @@
 // Created by leeyh on 2022/9/27.
 //
 
-#ifndef FFMPEGSTUDY_BASERENDER_H
-#define FFMPEGSTUDY_BASERENDER_H
+#ifndef FFMPEGSTUDY_BASEVIDEORENDER_H
+#define FFMPEGSTUDY_BASEVIDEORENDER_H
 
 #define VIDEO_RENDER_OPENGL             0
 #define VIDEO_RENDER_ANWINDOW           1
@@ -11,11 +11,11 @@
 
 #include "../util/ImageDef.h"
 
-class BaseRender {
+class BaseVideoRender {
 public:
-    BaseRender(int type);
+    BaseVideoRender(int type);
 
-    virtual ~BaseRender();
+    virtual ~BaseVideoRender();
 
     virtual void onCreate(int videoWidth, int videoHeight, int *dstSize) = 0;
 
@@ -30,4 +30,4 @@ private:
 };
 
 
-#endif //FFMPEGSTUDY_BASERENDER_H
+#endif //FFMPEGSTUDY_BASEVIDEORENDER_H
