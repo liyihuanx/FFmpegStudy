@@ -66,6 +66,7 @@ void AudioDecoder::onFrameAvailable(AVFrame *frame) {
                                  (const uint8_t **) frame->data,
                                  frame->nb_samples);
         if (result > 0) {
+
             audioRender->renderAudioFrame(audioOutBuffer, dst_frame_datasize);
         }
     }

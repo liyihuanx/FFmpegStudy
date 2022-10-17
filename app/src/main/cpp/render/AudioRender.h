@@ -10,6 +10,7 @@
 #include <SLES/OpenSLES.h>
 #include "BaseAudioRender.h"
 
+
 class AudioRender : public BaseAudioRender {
 
 public:
@@ -24,8 +25,15 @@ private:
     int createOutputMix();
     int createAudioPlayer();
 
-    void openSLESRender();
+    void startSLESRender();
+    void handleFrame();
+
+    int getAudioFrameQueueSize();
+
     static void audioPlayerCallback(SLAndroidSimpleBufferQueueItf bufferQueue, void *context);
+
+    static void createSLWaitingThread(AudioRender *openSlRender);
+
 
 private:
     // 创建引擎用的
@@ -39,7 +47,11 @@ private:
     SLVolumeItf m_AudioPlayerVolume = nullptr;
     SLAndroidSimpleBufferQueueItf bqPlayerBufferQueue;
 
-
+    queue<AudioFrame *> audioFrameQueue;
+    thread *audio_thread = nullptr;
+    mutex   audio_mutex;
+    condition_variable audio_cond;
+    volatile bool isExit = false;
 };
 
 

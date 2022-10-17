@@ -23,6 +23,10 @@ void AudioRender::onCreate() {
         goto end;
     }
 
+
+    audio_thread = new thread(createSLWaitingThread, this);
+
+
     end:
     LOGD("open_sles create fail, result = %d", result)
 }
@@ -33,6 +37,22 @@ void AudioRender::onDestroy() {
 
 void AudioRender::renderAudioFrame(uint8_t *pData, int dataSize) {
 //    LOGD("AudioRender::renderAudioFrame")
+    if (bqPlayerPlayInterface) {
+        if (pData != nullptr && dataSize > 0) {
+
+            //temp resolution, when queue size is too big.
+            while (getAudioFrameQueueSize() >= MAX_QUEUE_BUFFER_SIZE && !isExit) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(15));
+            }
+
+            unique_lock<mutex> lock(audio_mutex);
+            auto *audioFrame = new AudioFrame(pData, dataSize);
+            audioFrameQueue.push(audioFrame);
+            audio_cond.notify_all();
+            lock.unlock();
+        }
+    }
+
 }
 
 int AudioRender::createEngine() {
@@ -90,9 +110,9 @@ int AudioRender::createOutputMix() {
 }
 
 void AudioRender::audioPlayerCallback(SLAndroidSimpleBufferQueueItf bufferQueue, void *context) {
-    LOGD("AudioRender::audioPlayerCallback()")
+//    LOGD("AudioRender::audioPlayerCallback()")
     auto *openSlRender = static_cast<AudioRender *>(context);
-    openSlRender->openSLESRender();
+    openSlRender->handleFrame();
 }
 
 int AudioRender::createAudioPlayer() {
@@ -178,8 +198,48 @@ int AudioRender::createAudioPlayer() {
     return result;
 }
 
-void AudioRender::openSLESRender() {
-    LOGD("openSLESRender")
+void AudioRender::startSLESRender() {
+    LOGD("AudioRender::startSLESRender")
+
+    while (getAudioFrameQueueSize() < MAX_QUEUE_BUFFER_SIZE && !isExit) {
+        std::unique_lock<std::mutex> lock(audio_mutex);
+        audio_cond.wait_for(lock, std::chrono::milliseconds(10));
+        lock.unlock();
+    }
+
+    (*bqPlayerPlayInterface)->SetPlayState(bqPlayerPlayInterface, SL_PLAYSTATE_PLAYING);
+    audioPlayerCallback(bqPlayerBufferQueue, this);
+}
+
+void AudioRender::handleFrame() {
+//    LOGD("AudioRender::handleFrame")
+
+    while (getAudioFrameQueueSize() < MAX_QUEUE_BUFFER_SIZE && !isExit) {
+        std::unique_lock<std::mutex> lock(audio_mutex);
+        audio_cond.wait_for(lock, std::chrono::milliseconds(10));
+    }
+
+    std::unique_lock<std::mutex> lock(audio_mutex);
+    AudioFrame *audioFrame = audioFrameQueue.front();
+    if (nullptr != audioFrame && bqPlayerPlayInterface) {
+        SLresult result = (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, audioFrame->data,
+                                                          (SLuint32) audioFrame->dataSize);
+        if (result == SL_RESULT_SUCCESS) {
+            audioFrameQueue.pop();
+            delete audioFrame;
+        }
+
+    }
+    lock.unlock();
+}
+
+int AudioRender::getAudioFrameQueueSize() {
+    std::unique_lock<mutex> lock(audio_mutex);
+    return audioFrameQueue.size();
+}
+
+void AudioRender::createSLWaitingThread(AudioRender *openSlRender) {
+    openSlRender->startSLESRender();
 }
 
 

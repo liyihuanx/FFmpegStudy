@@ -6,6 +6,15 @@
 #define FFMPEGSTUDY_BASEAUDIORENDER_H
 
 #include "../log4c.h"
+#include "mutex"
+#include "thread"
+#include "condition_variable"
+#include "AudioFrame.h"
+#include "queue"
+
+#define MAX_QUEUE_BUFFER_SIZE 3
+
+using namespace std;
 
 class BaseAudioRender {
 public:
