@@ -14,13 +14,16 @@ extern "C" {
 #include <libavutil/samplefmt.h>
 #include <libavutil/opt.h>
 #include <libavutil/audio_fifo.h>
+#include <libavutil/time.h>
 };
 
 #include "../log4c.h"
 #include <thread>
 
-using namespace std;
+#define MAX_PATH   2048
+#define DELAY_THRESHOLD 100 //100ms
 
+using namespace std;
 
 class BaseDecoder {
 
@@ -43,6 +46,12 @@ private:
     AVMediaType avMediaType = AVMEDIA_TYPE_UNKNOWN;
     // 音视频流的下标
     int stream_index = -1;
+    // 当前播放时间
+    long curPlayTime = 0;
+    // 播放的起始时间
+    long startPlayTime = -1;
+    // 总时长 ms
+    long duration = 0;
 
     // 锁和条件变量
     mutex decode_mutex;
@@ -75,18 +84,28 @@ private:
     // 初始化video/audio解码器要使用的配置
     virtual void initDecoderEnvironment() = 0;
 
+    // 开始解码
     void startDecoder();
 
+    // 释放解放相关变量
     virtual void releaseDecoder() = 0;
 
+    // 更改播放状态
     void changeMediaStatus(int status);
 
+    // 解码packet
     int decodeOnePacket();
 
+    //更新显示时间戳
+    void updateTimeStamp();
+
+    //音视频同步
+    long syncAV();
 
     // 线程函数
     static void startDecodeTread(BaseDecoder *decoder);
 
+    // 向外提供解码后的frame帧
     virtual void onFrameAvailable(AVFrame *frame) = 0;
 
 };

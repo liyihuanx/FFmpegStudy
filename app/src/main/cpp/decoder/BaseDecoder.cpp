@@ -3,6 +3,7 @@
 //
 
 #include "BaseDecoder.h"
+#include "../util/util.h"
 
 void BaseDecoder::onCreate(char *url, AVMediaType mediaType) {
     // 深拷贝，免得变量释放后导致错误，长度+1 ==> 处理 \0
@@ -118,6 +119,10 @@ int BaseDecoder::initFFmpegEnvironment() {
 void BaseDecoder::startDecoder() {
     LOGD("startDecoder MediaType=%d", avMediaType);
 
+    if (startPlayTime == -1) {
+        startPlayTime = getSysCurrentTime();
+    }
+
     if (decodeOnePacket() != 0) {
         // 解码结束
 
@@ -141,9 +146,9 @@ int BaseDecoder::decodeOnePacket() {
             // 获取到YUV帧
             while (avcodec_receive_frame(avCodecContext, frame) >= 0) {
                 // 更新时间戳
-
+                updateTimeStamp();
                 // 同步
-
+                syncAV();
                 // 渲染
                 onFrameAvailable(frame);
 //                frameCount++;
@@ -172,6 +177,48 @@ AVCodecContext *BaseDecoder::getCodecContext() {
 // 改变播放状态
 void BaseDecoder::changeMediaStatus(int status) {
 
+}
+
+void BaseDecoder::updateTimeStamp() {
+//    LOGD("BaseDecoder::updateTimeStamp");
+    std::unique_lock<std::mutex> lock(decode_mutex);
+    // DTS:解码时间戳，用来告诉解码器Packet的解码顺序
+    // PTS:显示时间戳，表示从packet解码出来的的原始数据frame的显示顺序
+    // 时间基:看做时间刻度（如一把尺子有10格，我占据8份，如果刻度为1m，则为8m，刻度为1cm则为8cm）
+    if (frame->pkt_dts != AV_NOPTS_VALUE) {
+        curPlayTime = frame->pkt_dts;
+    } else if (frame->pts != AV_NOPTS_VALUE) {
+        curPlayTime = frame->pts;
+    } else {
+        curPlayTime = 0;
+    }
+
+    // 通过与时间基的计算,计算出该帧显示的正常时间
+    curPlayTime = (int64_t) ((curPlayTime * av_q2d(avFormatContext->streams[stream_index]->time_base)) * 1000);
+}
+
+long BaseDecoder::syncAV() {
+//    LOGD("DecoderBase::AVSync");
+    // 当前的系统时间
+    long curSysTime = getSysCurrentTime();
+    // 基于系统时钟计算从开始播放流逝的时间
+    //
+
+    long elapsedTime = curSysTime - startPlayTime;
+
+    long delay = 0;
+
+    // 向系统时钟同步, 音频或视频播放时间戳大于系统时钟时，解码线程进行休眠，直到时间戳与系统时钟对齐
+    if(curPlayTime > elapsedTime) {
+        // 休眠时间
+        auto sleepTime = static_cast<unsigned int>(curPlayTime - elapsedTime);//ms
+        // 限制休眠时间不能过长
+        sleepTime = sleepTime > DELAY_THRESHOLD ? DELAY_THRESHOLD :  sleepTime;
+        av_usleep(sleepTime * 1000);
+    }
+    delay = elapsedTime - curPlayTime;
+
+    return delay;
 }
 
 

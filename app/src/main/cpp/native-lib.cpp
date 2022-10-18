@@ -1,7 +1,7 @@
 #include <jni.h>
 #include <string>
 #include "log4c.h"
-#include "util.h"
+#include "util/util.h"
 #include "FFmpegPlayer.h"
 
 extern "C" {

@@ -55,4 +55,6 @@ target_link_libraries(
         android # ANativeWindow 用来渲染画面的
         OpenSLES # OpenSLES 用来播放声音的
 
+        EGL
+        GLESv3
 )
