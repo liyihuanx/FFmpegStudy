@@ -7,6 +7,8 @@ file(GLOB AllCPP
         ${CMAKE_SOURCE_DIR}/cpp/*.c
         ${CMAKE_SOURCE_DIR}/cpp/*.h
         ${CMAKE_SOURCE_DIR}/cpp/*.cpp
+        ${CMAKE_SOURCE_DIR}/cpp/*/*/*.h
+        ${CMAKE_SOURCE_DIR}/cpp/*/*/*.cpp
         ${CMAKE_SOURCE_DIR}/cpp/*/*.h
         ${CMAKE_SOURCE_DIR}/cpp/*/*.cpp
         )

@@ -5,7 +5,7 @@
 #ifndef FFMPEGSTUDY_BASEAUDIORENDER_H
 #define FFMPEGSTUDY_BASEAUDIORENDER_H
 
-#include "../log4c.h"
+#include "../../log4c.h"
 #include "mutex"
 #include "thread"
 #include "condition_variable"

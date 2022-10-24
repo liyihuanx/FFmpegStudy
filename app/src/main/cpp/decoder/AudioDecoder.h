@@ -7,7 +7,7 @@
 
 
 #include "BaseDecoder.h"
-#include "../render/BaseAudioRender.h"
+#include "../render/audio/BaseAudioRender.h"
 
 // 音频编码采样率
 static const int AUDIO_DST_SAMPLE_RATE = 44100;
@@ -32,7 +32,7 @@ public:
         onDestroy();
     }
 
-    void setVideoRender(BaseAudioRender *render) {
+    void setAudioRender(BaseAudioRender *render) {
         audioRender = render;
     }
 

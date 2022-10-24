@@ -3,6 +3,7 @@
 #include "log4c.h"
 #include "util/util.h"
 #include "FFmpegPlayer.h"
+#include "render/video/VideoOpenGLRender.h"
 
 extern "C" {
 #include <libavutil/avutil.h>
@@ -18,7 +19,7 @@ using namespace std;
 
 
 JavaVM *vm = nullptr;
-
+FFmpegPlayer *ffmpegPlayer = nullptr;
 
 jstring helloFFmpeg(
         JNIEnv *env,
@@ -51,7 +52,7 @@ jint JNI_OnLoad(JavaVM *jvm, void *) {
         return JNI_ERR;
     }
 
-    if (registerNativeMethods(env, "com/example/ffmpegstudy/MainActivity") != 1) {
+    if (registerNativeMethods(env, "com/example/ffmpegstudy/FFmpegPlayer") != 1) {
         return JNI_ERR;
     }
 
@@ -61,17 +62,42 @@ jint JNI_OnLoad(JavaVM *jvm, void *) {
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_example_ffmpegstudy_MainActivity_native_1playVideo(JNIEnv *env, jobject thiz, jstring url,
-                                                            jobject surface_view) {
-    char *dataSource = const_cast<char *>(env->GetStringUTFChars(url, nullptr));
+Java_com_example_ffmpegstudy_FFmpegPlayer_native_1OnSurfaceCreated(JNIEnv *env, jclass clazz,
+                                                                   jint render_type) {
+    VideoOpenGLRender::getInstance()->onSurfaceCreated();
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegstudy_FFmpegPlayer_native_1OnSurfaceChanged(JNIEnv *env, jclass clazz,
+                                                                   jint render_type, jint width,
+                                                                   jint height) {
+    VideoOpenGLRender::getInstance()->onSurfaceChanged(width, height);
 
-    LOGD("Play_Video")
-    auto *fFmpegPlayer = new FFmpegPlayer();
-    fFmpegPlayer->init(env, thiz, dataSource, surface_view);
-
-    // 释放掉
-    env->ReleaseStringUTFChars(url, dataSource);
-
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegstudy_FFmpegPlayer_native_1OnDrawFrame(JNIEnv *env, jclass clazz,
+                                                              jint render_type) {
+    VideoOpenGLRender::getInstance()->onDrawFrame();
 
 }
 
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegstudy_FFmpegPlayer_native_1play(JNIEnv *env, jobject thiz) {
+    ffmpegPlayer->play();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegstudy_FFmpegPlayer_native_1init(JNIEnv *env, jobject thiz, jint media_type,
+                                                       jstring url, jobject surface_view) {
+    LOGD("native_init")
+    char *dataSource = const_cast<char *>(env->GetStringUTFChars(url, nullptr));
+
+    ffmpegPlayer = new FFmpegPlayer();
+    ffmpegPlayer->init(env, thiz, dataSource, media_type, surface_view);
+
+    // 释放掉
+    env->ReleaseStringUTFChars(url, dataSource);
+}

@@ -13,12 +13,10 @@ import android.widget.TextView;
 
 import com.example.ffmpegstudy.databinding.ActivityMainBinding;
 
+import static com.example.ffmpegstudy.FFmpegPlayer.VIDEO_RENDER_ANWINDOW;
+
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
 
-    // Used to load the 'ffmpegstudy' library on application startup.
-    static {
-        System.loadLibrary("ffmpegstudy");
-    }
 
     private ActivityMainBinding binding;
 
@@ -27,6 +25,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     // /storage/emulated/0/Atestvideo/videotest1.mp4
 
     private String videoUrl = Environment.getExternalStorageDirectory().getPath() + "/Atestvideo/videotest1.mp4";
+
+    private FFmpegPlayer ffmpegPlayer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,18 +42,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     @Override
     public void surfaceCreated(@NonNull SurfaceHolder surfaceHolder) {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-//                native_play(surfaceHolder.getSurface());
-                native_playVideo("/data/data/com.example.ffmpegstudy/cache/testvideo1.mp4", surfaceHolder.getSurface());
-            }
-        }).start();
+        Log.d("JNI_LOG", "surfaceCreated");
+        ffmpegPlayer = new FFmpegPlayer();
+        ffmpegPlayer.native_init(VIDEO_RENDER_ANWINDOW, "/data/data/com.example.ffmpegstudy/cache/testvideo1.mp4", surfaceHolder.getSurface());
     }
 
     @Override
-    public void surfaceChanged(@NonNull SurfaceHolder surfaceHolder, int i, int i1, int i2) {
-
+    public void surfaceChanged(@NonNull SurfaceHolder surfaceHolder, int format, int w, int h) {
+        Log.d("JNI_LOG", "surfaceChanged");
+        ffmpegPlayer.native_play();
     }
 
     @Override
@@ -61,13 +58,4 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     }
 
-
-    /**
-     * A native method that is implemented by the 'ffmpegstudy' native library,
-     * which is packaged with this application.
-     */
-    public native String native_helloFFmpeg();
-
-    public native void native_playVideo(String url, Surface surfaceView);
-    public native int native_Mp4toYuv(String input, String output);
 }

@@ -25,6 +25,16 @@ extern "C" {
 
 using namespace std;
 
+typedef void (*MessageCallback)(void*, int, float);
+
+enum DecoderMsg {
+    MSG_DECODER_INIT_ERROR,
+    MSG_DECODER_READY,
+    MSG_DECODER_DONE,
+    MSG_REQUEST_RENDER,
+    MSG_DECODING_TIME
+};
+
 class BaseDecoder {
 
 private:
@@ -58,6 +68,7 @@ private:
     condition_variable decode_cond;
     thread *decode_thread = nullptr;
 
+
 public:
     BaseDecoder();
 
@@ -68,6 +79,14 @@ public:
 
     // 获取codec上下文
     AVCodecContext *getCodecContext();
+
+    void * m_MsgContext = nullptr;
+    MessageCallback m_MsgCallback = nullptr;
+
+    virtual void SetMessageCallback(void* context, MessageCallback callback) {
+        m_MsgContext = context;
+        m_MsgCallback = callback;
+    }
 
 protected:
     // 初始化Decoder（audio,video）

@@ -3,10 +3,10 @@
 //
 
 #include <SLES/OpenSLES_Android.h>
-#include "AudioRender.h"
+#include "AudioSLRender.h"
 
-void AudioRender::onCreate() {
-    LOGD("AudioRender::onCreate()")
+void AudioSLRender::onCreate() {
+    LOGD("AudioSLRender::onCreate()")
 
     int result = 0;
     result = createEngine();
@@ -23,20 +23,20 @@ void AudioRender::onCreate() {
         goto end;
     }
 
-
     audio_thread = new thread(createSLWaitingThread, this);
 
-
-    end:
-    LOGD("open_sles create fail, result = %d", result)
+end:
+    if (result != 0) {
+        LOGD("open_sles create fail, result = %d", result)
+    }
 }
 
-void AudioRender::onDestroy() {
+void AudioSLRender::onDestroy() {
 
 }
 
-void AudioRender::renderAudioFrame(uint8_t *pData, int dataSize) {
-//    LOGD("AudioRender::renderAudioFrame")
+void AudioSLRender::renderAudioFrame(uint8_t *pData, int dataSize) {
+//    LOGD("AudioSLRender::renderAudioFrame")
     if (bqPlayerPlayInterface) {
         if (pData != nullptr && dataSize > 0) {
 
@@ -55,8 +55,8 @@ void AudioRender::renderAudioFrame(uint8_t *pData, int dataSize) {
 
 }
 
-int AudioRender::createEngine() {
-    LOGD("AudioRender::createEngine()")
+int AudioSLRender::createEngine() {
+    LOGD("AudioSLRender::createEngine()")
     int result = SL_RESULT_SUCCESS;
     do {
         result = slCreateEngine(&engineObject, 0, nullptr, 0, nullptr, nullptr);
@@ -82,8 +82,8 @@ int AudioRender::createEngine() {
     return result;
 }
 
-int AudioRender::createOutputMix() {
-    LOGD("AudioRender::createOutputMix()")
+int AudioSLRender::createOutputMix() {
+    LOGD("AudioSLRender::createOutputMix()")
 
     int result = SL_RESULT_SUCCESS;
     do {
@@ -109,14 +109,14 @@ int AudioRender::createOutputMix() {
     return result;
 }
 
-void AudioRender::audioPlayerCallback(SLAndroidSimpleBufferQueueItf bufferQueue, void *context) {
-//    LOGD("AudioRender::audioPlayerCallback()")
-    auto *openSlRender = static_cast<AudioRender *>(context);
+void AudioSLRender::audioPlayerCallback(SLAndroidSimpleBufferQueueItf bufferQueue, void *context) {
+//    LOGD("AudioSLRender::audioPlayerCallback()")
+    auto *openSlRender = static_cast<AudioSLRender *>(context);
     openSlRender->handleFrame();
 }
 
-int AudioRender::createAudioPlayer() {
-    LOGD("AudioRender::createAudioPlayer()")
+int AudioSLRender::createAudioPlayer() {
+    LOGD("AudioSLRender::createAudioPlayer()")
     int result = SL_RESULT_SUCCESS;
     SLDataLocator_AndroidSimpleBufferQueue android_queue = {SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE,
                                                             2};
@@ -198,8 +198,8 @@ int AudioRender::createAudioPlayer() {
     return result;
 }
 
-void AudioRender::startSLESRender() {
-    LOGD("AudioRender::startSLESRender")
+void AudioSLRender::startSLESRender() {
+    LOGD("AudioSLRender::startSLESRender")
 
     while (getAudioFrameQueueSize() < MAX_QUEUE_BUFFER_SIZE && !isExit) {
         std::unique_lock<std::mutex> lock(audio_mutex);
@@ -211,8 +211,8 @@ void AudioRender::startSLESRender() {
     audioPlayerCallback(bqPlayerBufferQueue, this);
 }
 
-void AudioRender::handleFrame() {
-//    LOGD("AudioRender::handleFrame")
+void AudioSLRender::handleFrame() {
+//    LOGD("AudioSLRender::handleFrame")
 
     while (getAudioFrameQueueSize() < MAX_QUEUE_BUFFER_SIZE && !isExit) {
         std::unique_lock<std::mutex> lock(audio_mutex);
@@ -233,12 +233,12 @@ void AudioRender::handleFrame() {
     lock.unlock();
 }
 
-int AudioRender::getAudioFrameQueueSize() {
+int AudioSLRender::getAudioFrameQueueSize() {
     std::unique_lock<mutex> lock(audio_mutex);
     return audioFrameQueue.size();
 }
 
-void AudioRender::createSLWaitingThread(AudioRender *openSlRender) {
+void AudioSLRender::createSLWaitingThread(AudioSLRender *openSlRender) {
     openSlRender->startSLESRender();
 }
 

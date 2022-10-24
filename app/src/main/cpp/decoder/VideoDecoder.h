@@ -7,7 +7,7 @@
 
 
 #include "BaseDecoder.h"
-#include "../render/BaseVideoRender.h"
+#include "../render/video/BaseVideoRender.h"
 
 class VideoDecoder : public BaseDecoder {
 
@@ -23,6 +23,7 @@ public:
     }
 
     void setVideoRender(BaseVideoRender *render) {
+        LOGD("VideoDecoder::setVideoRender")
         videoRender = render;
     }
 
@@ -36,6 +37,9 @@ private:
 private:
     int video_height;
     int video_width;
+
+    int render_height;
+    int render_width;
 
     AVFrame *frame_rgb = nullptr;
     uint8_t *frame_rgb_buffer = nullptr;

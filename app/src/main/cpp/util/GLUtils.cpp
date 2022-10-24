@@ -4,28 +4,35 @@
 GLuint GLUtils::LoadShader(GLenum shaderType, const char *pSource) {
     GLuint shader = 0;
     FUN_BEGIN_TIME("GLUtils::LoadShader")
-        shader = glCreateShader(shaderType);
-        if (shader) {
-            glShaderSource(shader, 1, &pSource, NULL);
-            glCompileShader(shader);
-            GLint compiled = 0;
-            glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
-            if (!compiled) {
-                GLint infoLen = 0;
-                glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLen);
-                if (infoLen) {
-                    char *buf = (char *) malloc((size_t) infoLen);
-                    if (buf) {
-                        glGetShaderInfoLog(shader, infoLen, NULL, buf);
-                        LOGD("GLUtils::LoadShader Could not compile shader %d:\n%s\n", shaderType,
-                             buf);
-                        free(buf);
-                    }
-                    glDeleteShader(shader);
-                    shader = 0;
+    // 创建一个新shader
+    shader = glCreateShader(shaderType);
+    if (shader) {
+        // 加载shader源代码
+        glShaderSource(shader, 1, &pSource, NULL);
+        // 编译shader
+        glCompileShader(shader);
+        // 存放编译结果的变量
+        GLint compiled = 0;
+        // 获取shader编译的结果
+        glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+        // 0=false
+        if (!compiled) {
+            GLint infoLen = 0;
+            // 获取错误日志长度？
+            glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLen);
+            if (infoLen) {
+                char *buf = (char *) malloc((size_t) infoLen);
+                if (buf) {
+                    glGetShaderInfoLog(shader, infoLen, NULL, buf);
+                    LOGD("GLUtils::LoadShader Could not compile shader %d:\n%s\n", shaderType, buf);
+                    free(buf);
                 }
+                // 出错则删除
+                glDeleteShader(shader);
+                shader = 0;
             }
         }
+    }
     FUN_END_TIME("GLUtils::LoadShader")
     return shader;
 }
@@ -34,42 +41,55 @@ GLuint GLUtils::CreateProgram(const char *pVertexShaderSource, const char *pFrag
                               GLuint &vertexShaderHandle, GLuint &fragShaderHandle) {
     GLuint program = 0;
     FUN_BEGIN_TIME("GLUtils::CreateProgram")
-        vertexShaderHandle = LoadShader(GL_VERTEX_SHADER, pVertexShaderSource);
-        if (!vertexShaderHandle) return program;
-        fragShaderHandle = LoadShader(GL_FRAGMENT_SHADER, pFragShaderSource);
-        if (!fragShaderHandle) return program;
+    // 加载顶点着色器
+    vertexShaderHandle = LoadShader(GL_VERTEX_SHADER, pVertexShaderSource);
+    if (!vertexShaderHandle) return program;
+    // 加载片元着色器
+    fragShaderHandle = LoadShader(GL_FRAGMENT_SHADER, pFragShaderSource);
+    if (!fragShaderHandle) return program;
 
-        program = glCreateProgram();
-        if (program) {
-            glAttachShader(program, vertexShaderHandle);
-            CheckGLError("glAttachShader");
-            glAttachShader(program, fragShaderHandle);
-            CheckGLError("glAttachShader");
-            glLinkProgram(program);
-            GLint linkStatus = GL_FALSE;
-            glGetProgramiv(program, GL_LINK_STATUS, &linkStatus);
+    // 新建一个程序
+    program = glCreateProgram();
+    if (program) {
+        // 若程序创建成功则向程序中加入顶点着色器与片元着色器
+        glAttachShader(program, vertexShaderHandle);
+        CheckGLError("glAttachShader");
+        glAttachShader(program, fragShaderHandle);
+        CheckGLError("glAttachShader");
 
-            glDetachShader(program, vertexShaderHandle);
-            glDeleteShader(vertexShaderHandle);
-            vertexShaderHandle = 0;
-            glDetachShader(program, fragShaderHandle);
-            glDeleteShader(fragShaderHandle);
-            fragShaderHandle = 0;
-            if (linkStatus != GL_TRUE) {
-                GLint bufLength = 0;
-                glGetProgramiv(program, GL_INFO_LOG_LENGTH, &bufLength);
-                if (bufLength) {
-                    char *buf = (char *) malloc((size_t) bufLength);
-                    if (buf) {
-                        glGetProgramInfoLog(program, bufLength, NULL, buf);
-                        LOGD("GLUtils::CreateProgram Could not link program:\n%s\n", buf);
-                        free(buf);
-                    }
+        // 链接程序
+        glLinkProgram(program);
+
+        // 获得链接情况
+        GLint linkStatus = GL_FALSE;
+        glGetProgramiv(program, GL_LINK_STATUS, &linkStatus);
+
+        // 从程序移除着色器
+        glDetachShader(program, vertexShaderHandle);
+        // 删除shader
+        glDeleteShader(vertexShaderHandle);
+        vertexShaderHandle = 0;
+
+        glDetachShader(program, fragShaderHandle);
+        glDeleteShader(fragShaderHandle);
+        fragShaderHandle = 0;
+
+        // 链接出错的处理
+        if (linkStatus != GL_TRUE) {
+            GLint bufLength = 0;
+            glGetProgramiv(program, GL_INFO_LOG_LENGTH, &bufLength);
+            if (bufLength) {
+                char *buf = (char *) malloc((size_t) bufLength);
+                if (buf) {
+                    glGetProgramInfoLog(program, bufLength, NULL, buf);
+                    LOGD("GLUtils::CreateProgram Could not link program:\n%s\n", buf);
+                    free(buf);
                 }
-                glDeleteProgram(program);
-                program = 0;
             }
+            glDeleteProgram(program);
+            program = 0;
         }
+    }
     FUN_END_TIME("GLUtils::CreateProgram")
     LOGD("GLUtils::CreateProgram program = %d", program);
     return program;

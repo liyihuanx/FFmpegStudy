@@ -2,8 +2,8 @@
 // Created by leeyh on 2022/9/27.
 //
 
-#ifndef FFMPEGSTUDY_AUDIORENDER_H
-#define FFMPEGSTUDY_AUDIORENDER_H
+#ifndef FFMPEGSTUDY_AUDIOSLRENDER_H
+#define FFMPEGSTUDY_AUDIOSLRENDER_H
 
 
 #include <cstdint>
@@ -11,7 +11,7 @@
 #include "BaseAudioRender.h"
 
 
-class AudioRender : public BaseAudioRender {
+class AudioSLRender : public BaseAudioRender {
 
 public:
     virtual void onCreate();
@@ -32,7 +32,7 @@ private:
 
     static void audioPlayerCallback(SLAndroidSimpleBufferQueueItf bufferQueue, void *context);
 
-    static void createSLWaitingThread(AudioRender *openSlRender);
+    static void createSLWaitingThread(AudioSLRender *openSlRender);
 
 
 private:
@@ -55,4 +55,4 @@ private:
 };
 
 
-#endif //FFMPEGSTUDY_AUDIORENDER_H
+#endif //FFMPEGSTUDY_AUDIOSLRENDER_H

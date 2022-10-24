@@ -10,19 +10,37 @@ ANativeRender::ANativeRender(JNIEnv *env, jobject surface) : BaseVideoRender(VID
 }
 
 ANativeRender::~ANativeRender() {
-
     if (nativeWindow) {
         ANativeWindow_release(nativeWindow);
     }
 }
 
 void ANativeRender::onCreate(int videoWidth, int videoHeight, int *dstSize) {
-    ANativeWindow_setBuffersGeometry(nativeWindow, videoWidth,
-                                     videoHeight, WINDOW_FORMAT_RGBA_8888);
+    LOGD("ANativeRender::onCreate")
+    int windowWidth = ANativeWindow_getWidth(nativeWindow);
+    int windowHeight = ANativeWindow_getHeight(nativeWindow);
+
+    if (windowWidth < windowHeight * videoWidth / videoHeight) {
+        dst_width = windowWidth;
+        dst_height = windowWidth * videoHeight / videoWidth;
+    } else {
+        dst_width = windowHeight * videoWidth / videoHeight;
+        dst_height = windowHeight;
+    }
+    if (dstSize != nullptr) {
+        dstSize[0] = dst_width;
+        dstSize[1] = dst_height;
+    }
+
+    ANativeWindow_setBuffersGeometry(nativeWindow, dst_width,
+                                     dst_height, WINDOW_FORMAT_RGBA_8888);
 }
 
 void ANativeRender::renderVideoFrame(NativeImage *pImage) {
 //    LOGD("ANativeRender::renderVideoFrame")
+
+    if(nativeWindow == nullptr || pImage == nullptr) return;
+
     ANativeWindow_lock(nativeWindow, &nativeWindowBuffer, nullptr);
 
     uint8_t *dst = static_cast<uint8_t *>(nativeWindowBuffer.bits);
