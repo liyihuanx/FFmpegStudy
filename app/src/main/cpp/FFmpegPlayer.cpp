@@ -36,13 +36,13 @@ void FFmpegPlayer::init(JNIEnv *jniEnv, jobject obj, char *url, int videoRenderT
         videoDecoder->setVideoRender(videoRender);
     }
 
-//    // 音频
-//    audioDecoder = new AudioDecoder(url);
-//    audioRender = new AudioSLRender();
-//    // 音频渲染
-//    audioDecoder->setAudioRender(audioRender);
-//    // 视频回调
-//    audioDecoder->SetMessageCallback(this, PostMessage);
+    // 音频
+    audioDecoder = new AudioDecoder(url);
+    audioRender = new AudioSLRender();
+    // 音频渲染
+    audioDecoder->setAudioRender(audioRender);
+    // 视频回调
+    audioDecoder->SetMessageCallback(this, PostMessage);
 
 }
 

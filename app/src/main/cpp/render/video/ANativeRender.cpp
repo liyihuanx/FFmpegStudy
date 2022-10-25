@@ -43,11 +43,12 @@ void ANativeRender::renderVideoFrame(NativeImage *pImage) {
 
     ANativeWindow_lock(nativeWindow, &nativeWindowBuffer, nullptr);
 
+    // 6.2 目的destination
     uint8_t *dst = static_cast<uint8_t *>(nativeWindowBuffer.bits);
     // 6.3 输入图的步长，一行像素有多少个字节
     int dstLineSize = nativeWindowBuffer.stride * 4;
 
-    // 6.4 目标
+    // 6.4 来源source
     uint8_t *src = pImage->ppPlane[0];
     int srcLineSize = pImage->pLineSize[0];
 

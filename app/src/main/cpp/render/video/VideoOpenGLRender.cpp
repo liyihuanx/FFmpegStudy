@@ -76,6 +76,7 @@ static char fShaderStr[] =
         "    }\n"
         "}";
 
+// opengl坐标系，屏幕中点为(0,0)
 GLfloat verticesCoords[] = {
         -1.0f, 1.0f, 0.0f,  // Position 0
         -1.0f, -1.0f, 0.0f,  // Position 1
@@ -83,6 +84,7 @@ GLfloat verticesCoords[] = {
         1.0f, 1.0f, 0.0f,  // Position 3
 };
 
+// 纹理坐标系，和android坐标系0.5y轴对称
 GLfloat textureCoords[] = {
         0.0f, 0.0f,        // TexCoord 0
         0.0f, 1.0f,        // TexCoord 1
@@ -90,7 +92,10 @@ GLfloat textureCoords[] = {
         1.0f, 0.0f         // TexCoord 3
 };
 
-GLushort indices[] = {0, 1, 2, 0, 2, 3};
+GLushort indices[] = {
+        0, 1, 2,  // first triangle
+        0, 2, 3   // second triangle
+};
 
 VideoOpenGLRender::VideoOpenGLRender() : BaseVideoRender(VIDEO_RENDER_OPENGL) {
 
@@ -114,18 +119,22 @@ void VideoOpenGLRender::onCreate(int videoWidth, int videoHeight, int *dstSize) 
 void VideoOpenGLRender::renderVideoFrame(NativeImage *pImage) {
     if (pImage == nullptr || pImage->ppPlane[0] == nullptr)
         return;
-    //加互斥锁，解码线程和渲染线程是 2 个不同的线程，避免数据访问冲突
+    // 加互斥锁，解码线程和渲染线程是 2 个不同的线程，避免数据访问冲突
     std::unique_lock<std::mutex> lock(video_gl_mutex);
+    // 解码到第一帧，初始化renderImage
     if (pImage->width != renderImage.width || pImage->height != renderImage.height) {
         if (renderImage.ppPlane[0] != nullptr) {
             NativeImageUtil::FreeNativeImage(&renderImage);
         }
         memset(&renderImage, 0, sizeof(NativeImage));
+        // 赋值frame的一些常规变量
         renderImage.format = pImage->format;
         renderImage.width = pImage->width;
         renderImage.height = pImage->height;
+        // 根据format类型，创建存放容器
         NativeImageUtil::AllocNativeImage(&renderImage);
     }
+    // 将数据复制到容器中
     NativeImageUtil::CopyNativeImage(pImage, &renderImage);
 }
 
@@ -253,9 +262,16 @@ void VideoOpenGLRender::onDrawFrame() {
             //upload Y plane data
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, m_TextureIds[0]);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, renderImage.width,
-                         renderImage.height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE,
-                         renderImage.ppPlane[0]);
+            glTexImage2D(GL_TEXTURE_2D,
+                         0,             // 指定要Mipmap的等级
+                         GL_LUMINANCE,       // gpu内部格式，告诉OpenGL内部用什么格式存储和使用这个纹理数据
+                         renderImage.width,  // 加载的纹理宽度。最好为2的次幂
+                         renderImage.height, // 加载的纹理高度。最好为2的次幂
+                         0,           // 纹理边框
+                         GL_LUMINANCE,       // 数据的像素格式 亮度，灰度图
+                         GL_UNSIGNED_BYTE,   // 一个像素点存储的数据类型
+                         renderImage.ppPlane[0] // 纹理的数据
+            );
             glBindTexture(GL_TEXTURE_2D, GL_NONE);
 
             //update U plane data
