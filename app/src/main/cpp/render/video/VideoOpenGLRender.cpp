@@ -142,36 +142,52 @@ void VideoOpenGLRender::onSurfaceCreated() {
         LOGD("VideoGLRender::OnSurfaceCreated create program fail");
         return;
     }
-
+    // 创建纹理
     glGenTextures(TEXTURE_NUM, m_TextureIds);
     for (int i = 0; i < TEXTURE_NUM; ++i) {
+        // 激活纹理单元
         glActiveTexture(GL_TEXTURE0 + i);
+        // 绑定纹理
         glBindTexture(GL_TEXTURE_2D, m_TextureIds[i]);
+        // 纹理配置：GL_TEXTURE_WRAP_S（横坐标）,GL_TEXTURE_WRAP_T（纵坐标）
+        // GL_CLAMP_TO_EDGE：采样纹理边缘，即剩余部分显示纹理临近的边缘颜色值
+        // GL_REPEAT：重复纹理
+        // GL_MIRRORED_REPEAT:镜像重复
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        // 纹理过滤配置
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        // 解绑
         glBindTexture(GL_TEXTURE_2D, GL_NONE);
     }
 
-    // Generate VBO Ids and load the VBOs with data
+    // 创建VBO专门缓冲顶点数据，将创建好的vbo的id存放在VBOs数组中
     glGenBuffers(3, m_VboIds);
+    // 此时上下文绑定VBOs[0]对应的vbo缓冲
     glBindBuffer(GL_ARRAY_BUFFER, m_VboIds[0]);
+    // 将顶点数据存入vbo的缓冲区中
     glBufferData(GL_ARRAY_BUFFER, sizeof(verticesCoords), verticesCoords, GL_STATIC_DRAW);
 
     glBindBuffer(GL_ARRAY_BUFFER, m_VboIds[1]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(textureCoords), textureCoords, GL_STATIC_DRAW);
 
+    // 绑定EBO缓冲对象,专门缓冲顶点索引数据
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_VboIds[2]);
+    // 给EBO缓冲对象传入索引数据
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-    // Generate VAO Id
+    // 创建VAO,将VBO或者EBO等缓冲的配置操作缓存起来
     glGenVertexArrays(1, &m_VaoId);
+    // 绑定VAO,接下来对VBO的操作都会缓存到这
     glBindVertexArray(m_VaoId);
 
     glBindBuffer(GL_ARRAY_BUFFER, m_VboIds[0]);
+    // 打开着色器中layout为0的输入变量
     glEnableVertexAttribArray(0);
+    // 指定如何解析顶点属性数组，注意这里最后一个参数传的不是原数组地址，而是数据再vbo缓冲区中的相对地址
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (const void *) 0);
+    // 解绑
     glBindBuffer(GL_ARRAY_BUFFER, GL_NONE);
 
     glBindBuffer(GL_ARRAY_BUFFER, m_VboIds[1]);
@@ -179,8 +195,8 @@ void VideoOpenGLRender::onSurfaceCreated() {
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (const void *) 0);
     glBindBuffer(GL_ARRAY_BUFFER, GL_NONE);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_VboIds[2]);
 
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_VboIds[2]);
     glBindVertexArray(GL_NONE);
 
     m_TouchXY = vec2(0.5f, 0.5f);
@@ -285,6 +301,7 @@ void VideoOpenGLRender::onDrawFrame() {
     GLUtils::setVec2(m_ProgramObj, "u_TexSize", vec2(renderImage.width, renderImage.height));
     GLUtils::setInt(m_ProgramObj, "u_nImgType", renderImage.format);
 
+    // 从indices中按顺序取出索引对应6个顶点依次进行绘制，图元类型为GL_TRIANGLES
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, (const void *) 0);
 
 }
