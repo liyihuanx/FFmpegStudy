@@ -8,8 +8,8 @@
 void VideoDecoder::initDecoderEnvironment() {
     LOGD("VideoDecoder::initDecoderEnvironment()")
     // 获取视频宽高
-    video_height = getCodecContext()->height;
     video_width = getCodecContext()->width;
+    video_height = getCodecContext()->height;
 
     // 初始化渲染器
     if (videoRender != nullptr) {
@@ -24,18 +24,18 @@ void VideoDecoder::initDecoderEnvironment() {
     frame_rgb = av_frame_alloc();
 
     // 根据宽高，格式，获取要填充的buffer-size
-    int bufferSize = av_image_get_buffer_size(AV_PIX_FMT_RGBA, render_width, render_height,1);
+    int bufferSize = av_image_get_buffer_size(AV_PIX_FMT_RGBA, render_width, render_height, 1);
 
     // 申请framebuffer空间
     frame_rgb_buffer = static_cast<uint8_t *>(av_malloc(bufferSize * sizeof(uint8_t)));
 
     av_image_fill_arrays(frame_rgb->data, frame_rgb->linesize,
-                               frame_rgb_buffer, AV_PIX_FMT_RGBA,
-                               render_width, render_height, 1);
+                         frame_rgb_buffer, AV_PIX_FMT_RGBA,
+                         render_width, render_height, 1);
 
     videoSwsCtx = sws_getContext(
             // src 源
-            video_height, video_width,
+            video_width, video_height,
             getCodecContext()->pix_fmt,
             // dst 目标
             render_width, render_height,
@@ -46,7 +46,7 @@ void VideoDecoder::initDecoderEnvironment() {
 // 做格式转换
 void VideoDecoder::onFrameAvailable(AVFrame *frame) {
     // 从packet解码出来的frame(YUV原始帧)
-//    LOGD("VideoDecoder::onFrameAvailable frame=%p", frame);
+    LOGD("VideoDecoder::onFrameAvailable frame=%p", frame);
 
     if (frame != nullptr && videoRender != nullptr) {
         NativeImage nativeImage;
@@ -113,7 +113,7 @@ void VideoDecoder::onFrameAvailable(AVFrame *frame) {
 
     }
 
-    if(m_MsgContext && m_MsgCallback) {
+    if (m_MsgContext && m_MsgCallback) {
 //        LOGD("m_MsgCallback - MSG_REQUEST_RENDER")
         m_MsgCallback(m_MsgContext, MSG_REQUEST_RENDER, 0);
     }

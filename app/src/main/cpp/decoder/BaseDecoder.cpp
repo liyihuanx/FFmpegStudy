@@ -20,6 +20,30 @@ void BaseDecoder::onDestroy() {
         delete data_source;
         data_source = nullptr;
     }
+
+    if (frame != nullptr) {
+        av_frame_free(&frame);
+        frame = nullptr;
+    }
+
+    if (packet != nullptr) {
+        av_packet_free(&packet);
+        packet = nullptr;
+    }
+
+    if (avCodecContext != nullptr) {
+        avcodec_close(avCodecContext);
+        avcodec_free_context(&avCodecContext);
+        avCodecContext = nullptr;
+        avCodec = nullptr;
+    }
+
+    if (avFormatContext != nullptr) {
+        avformat_close_input(&avFormatContext);
+        avformat_free_context(avFormatContext);
+        avFormatContext = nullptr;
+    }
+
 }
 
 void BaseDecoder::start() {
@@ -194,7 +218,8 @@ void BaseDecoder::updateTimeStamp() {
     }
 
     // 通过与时间基的计算,计算出该帧显示的正常时间
-    curPlayTime = (int64_t) ((curPlayTime * av_q2d(avFormatContext->streams[stream_index]->time_base)) * 1000);
+    curPlayTime = (int64_t) (
+            (curPlayTime * av_q2d(avFormatContext->streams[stream_index]->time_base)) * 1000);
 }
 
 long BaseDecoder::syncAV() {
@@ -209,11 +234,11 @@ long BaseDecoder::syncAV() {
     long delay = 0;
 
     // 向系统时钟同步, 音频或视频播放时间戳大于系统时钟时，解码线程进行休眠，直到时间戳与系统时钟对齐
-    if(curPlayTime > elapsedTime) {
+    if (curPlayTime > elapsedTime) {
         // 休眠时间
         auto sleepTime = static_cast<unsigned int>(curPlayTime - elapsedTime);//ms
         // 限制休眠时间不能过长
-        sleepTime = sleepTime > DELAY_THRESHOLD ? DELAY_THRESHOLD :  sleepTime;
+        sleepTime = sleepTime > DELAY_THRESHOLD ? DELAY_THRESHOLD : sleepTime;
         av_usleep(sleepTime * 1000);
     }
     delay = elapsedTime - curPlayTime;

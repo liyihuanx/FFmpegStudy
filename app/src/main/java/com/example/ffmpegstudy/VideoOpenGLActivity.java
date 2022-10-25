@@ -100,7 +100,7 @@ public class VideoOpenGLActivity extends AppCompatActivity implements GLSurfaceV
                     case MSG_DECODER_DONE:
                         break;
                     case MSG_REQUEST_RENDER:
-                        Log.d("JNI_LOG", "run MSG_REQUEST_RENDER callback ");
+//                        Log.d("JNI_LOG", "run MSG_REQUEST_RENDER callback ");
                         mGLSurfaceView.requestRender();
                         break;
                     case MSG_DECODING_TIME:
