@@ -25,7 +25,14 @@ extern "C" {
 
 using namespace std;
 
-typedef void (*MessageCallback)(void*, int, float);
+typedef void (*MessageCallback)(void *, int, float);
+
+enum DecoderState {
+    STATE_UNKNOWN,
+    STATE_DECODING,
+    STATE_PAUSE,
+    STATE_STOP
+};
 
 enum DecoderMsg {
     MSG_DECODER_INIT_ERROR,
@@ -68,7 +75,8 @@ private:
     condition_variable decode_cond;
     thread *decode_thread = nullptr;
 
-
+    //解码器状态
+    volatile int decoderState = STATE_UNKNOWN;
 public:
     BaseDecoder();
 
@@ -77,13 +85,19 @@ public:
     // 给player调用
     void start();
 
+    void resume();
+
+    void pause();
+
+    void stop();
+
     // 获取codec上下文
     AVCodecContext *getCodecContext();
 
-    void * m_MsgContext = nullptr;
+    void *m_MsgContext = nullptr;
     MessageCallback m_MsgCallback = nullptr;
 
-    virtual void SetMessageCallback(void* context, MessageCallback callback) {
+    virtual void SetMessageCallback(void *context, MessageCallback callback) {
         m_MsgContext = context;
         m_MsgCallback = callback;
     }

@@ -75,5 +75,16 @@ void AudioDecoder::onFrameAvailable(AVFrame *frame) {
 }
 
 void AudioDecoder::releaseDecoder() {
+    if(audioRender)
+        audioRender->onDestroy();
 
+    if(audioOutBuffer) {
+        free(audioOutBuffer);
+        audioOutBuffer = nullptr;
+    }
+
+    if(audioSwrCtx) {
+        swr_free(&audioSwrCtx);
+        audioSwrCtx = nullptr;
+    }
 }

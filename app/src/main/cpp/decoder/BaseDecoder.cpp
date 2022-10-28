@@ -48,7 +48,7 @@ void BaseDecoder::onDestroy() {
 
 void BaseDecoder::start() {
     LOGD("BaseDecoder::start()")
-    new thread(startDecodeTread, this);
+    decode_thread = new thread(startDecodeTread, this);
 }
 
 
@@ -142,15 +142,36 @@ int BaseDecoder::initFFmpegEnvironment() {
 // 开始解码工作
 void BaseDecoder::startDecoder() {
     LOGD("startDecoder MediaType=%d", avMediaType);
-
-    if (startPlayTime == -1) {
-        startPlayTime = getSysCurrentTime();
+    {
+        std::unique_lock<std::mutex> lock(decode_mutex);
+        decoderState = STATE_DECODING;
+        lock.unlock();
     }
 
-    if (decodeOnePacket() != 0) {
-        // 解码结束
+    for (;;) {
+        while (decoderState == STATE_PAUSE) {
+            std::unique_lock<std::mutex> lock(decode_mutex);
+            LOGD("DecoderBase::DecodingLoop waiting, avMediaType=%d", avMediaType);
+            decode_cond.wait_for(lock, std::chrono::milliseconds(10));
+            startPlayTime = getSysCurrentTime() - curPlayTime;
+        }
 
+        if (decoderState == STATE_STOP) {
+            break;
+        }
+
+        if (startPlayTime == -1) {
+            startPlayTime = getSysCurrentTime();
+        }
+
+        if (decodeOnePacket() != 0) {
+            //解码结束，暂停解码器
+            std::unique_lock<std::mutex> lock(decode_mutex);
+            decoderState = STATE_PAUSE;
+        }
     }
+    LOGD("BaseDecoder::startDecoder end");
+
 
 }
 
@@ -244,6 +265,23 @@ long BaseDecoder::syncAV() {
     delay = elapsedTime - curPlayTime;
 
     return delay;
+}
+
+void BaseDecoder::resume() {
+    unique_lock<mutex> lock(decode_mutex);
+    decoderState = STATE_DECODING;
+    decode_cond.notify_all();
+}
+
+void BaseDecoder::pause() {
+    unique_lock<mutex> lock(decode_mutex);
+    decoderState = STATE_PAUSE;
+}
+
+void BaseDecoder::stop() {
+    unique_lock<mutex> lock(decode_mutex);
+    decoderState = STATE_STOP;
+    decode_cond.notify_all();
 }
 
 

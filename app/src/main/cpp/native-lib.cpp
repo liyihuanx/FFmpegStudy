@@ -101,3 +101,27 @@ Java_com_example_ffmpegstudy_FFmpegPlayer_native_1init(JNIEnv *env, jobject thiz
     // 释放掉
     env->ReleaseStringUTFChars(url, dataSource);
 }
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegstudy_FFmpegPlayer_native_1uninit(JNIEnv *env, jobject thiz) {
+    LOGD("native_uninit")
+    ffmpegPlayer->uninit();
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegstudy_FFmpegPlayer_native_1resume(JNIEnv *env, jobject thiz) {
+    LOGD("native_resume")
+    ffmpegPlayer->resume();
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegstudy_FFmpegPlayer_native_1pause(JNIEnv *env, jobject thiz) {
+    LOGD("native_pause")
+    ffmpegPlayer->pause();
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegstudy_FFmpegPlayer_native_1stop(JNIEnv *env, jobject thiz) {
+    LOGD("native_stop")
+    ffmpegPlayer->stop();
+}

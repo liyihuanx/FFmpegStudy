@@ -20,7 +20,8 @@ FFmpegPlayer::~FFmpegPlayer() {
 
 }
 
-void FFmpegPlayer::init(JNIEnv *jniEnv, jobject obj, char *url, int videoRenderType, jobject surface) {
+void
+FFmpegPlayer::init(JNIEnv *jniEnv, jobject obj, char *url, int videoRenderType, jobject surface) {
     LOGD("FFmpegPlayer::init");
     jniEnv->GetJavaVM(&m_JavaVM);
     m_JavaObj = jniEnv->NewGlobalRef(obj);
@@ -98,6 +99,52 @@ jobject FFmpegPlayer::GetJavaObj() {
 JavaVM *FFmpegPlayer::GetJavaVM() {
     return m_JavaVM;
 }
+
+void FFmpegPlayer::uninit() {
+    if (videoDecoder) {
+        delete videoDecoder;
+        videoDecoder = nullptr;
+    }
+
+    if (videoRender) {
+        delete videoRender;
+        videoRender = nullptr;
+    }
+
+    if (audioDecoder) {
+        delete audioDecoder;
+        audioDecoder = nullptr;
+    }
+
+    if (audioRender) {
+        delete audioRender;
+        audioRender = nullptr;
+    }
+
+    VideoOpenGLRender::releaseInstance();
+
+    bool isAttach = false;
+    GetJNIEnv(&isAttach)->DeleteGlobalRef(m_JavaObj);
+    if (isAttach)
+        GetJavaVM()->DetachCurrentThread();
+}
+
+void FFmpegPlayer::resume() {
+    if (videoDecoder) videoDecoder->resume();
+    if (audioDecoder) audioDecoder->resume();
+}
+
+void FFmpegPlayer::pause() {
+    if (videoDecoder) videoDecoder->pause();
+    if (audioDecoder) audioDecoder->pause();
+}
+
+void FFmpegPlayer::stop() {
+    if (videoDecoder) videoDecoder->stop();
+    if (audioDecoder) audioDecoder->stop();
+}
+
+
 
 
 
