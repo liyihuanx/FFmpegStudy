@@ -39,8 +39,12 @@ public:
     ~FFmpegPlayer();
 
     void init(JNIEnv *jniEnv, jobject obj, char *url, int videoRenderType, jobject surface);
+    void uninit();
 
     void play();
+    void resume();
+    void pause();
+    void stop();
 
     static void PostMessage(void *context, int msgType, float msgCode);
 

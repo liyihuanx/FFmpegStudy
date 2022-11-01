@@ -8,15 +8,16 @@
     tools:context=".MainActivity">
 
     <Button
-        android:id="@+id/helloFFmpeg"
+        android:id="@+id/ANativeRender"
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:text="helloFFmpeg" />
+        android:text="ANative-Render" />
 
-    <SurfaceView
-        android:id="@+id/sfView"
+    <Button
+        android:id="@+id/OpenGLRender"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
+        android:layout_height="50dp"
+        android:text="OpenGL-Render" />
 
 
 </LinearLayout>

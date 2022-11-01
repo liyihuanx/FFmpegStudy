@@ -49,8 +49,11 @@ class FFmpegPlayer {
     public native String native_helloFFmpeg();
 
     public native void native_init(int mediaType, String url, Surface surfaceView);
+    public native void native_uninit();
     public native void native_play();
-
+    public native void native_resume();
+    public native void native_pause();
+    public native void native_stop();
 
 
 
