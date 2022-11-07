@@ -4,6 +4,7 @@
 #include "util/util.h"
 #include "FFmpegPlayer.h"
 #include "render/video/VideoOpenGLRender.h"
+#include "record/MediaRecorderContext.h"
 
 extern "C" {
 #include <libavutil/avutil.h>
@@ -124,4 +125,66 @@ JNIEXPORT void JNICALL
 Java_com_example_ffmpegstudy_FFmpegPlayer_native_1stop(JNIEnv *env, jobject thiz) {
     LOGD("native_stop")
     ffmpegPlayer->stop();
+}
+
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegstudy_camera_FFMediaRecord_native_1CreateContext(JNIEnv *env, jobject thiz) {
+    MediaRecorderContext::CreateContext(env, thiz);
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegstudy_camera_FFMediaRecord_native_1DestroyContext(JNIEnv *env,
+                                                                         jobject thiz) {
+    MediaRecorderContext::DeleteContext(env, thiz);
+}
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_example_ffmpegstudy_camera_FFMediaRecord_native_1Init(JNIEnv *env, jobject thiz) {
+    MediaRecorderContext *pContext = MediaRecorderContext::GetContext(env, thiz);
+    if (pContext) return pContext->Init();
+    return 0;
+}
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_example_ffmpegstudy_camera_FFMediaRecord_native_1UnInit(JNIEnv *env, jobject thiz) {
+    MediaRecorderContext *pContext = MediaRecorderContext::GetContext(env, thiz);
+    if (pContext) return pContext->UnInit();
+    return 0;
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegstudy_camera_FFMediaRecord_native_1OnPreviewFrame(JNIEnv *env, jobject thiz,
+                                                                         jint format,
+                                                                         jbyteArray data,
+                                                                         jint width, jint height) {
+    int len = env->GetArrayLength (data);
+    auto* buf = new unsigned char[len];
+    env->GetByteArrayRegion(data, 0, len, reinterpret_cast<jbyte*>(buf));
+
+    MediaRecorderContext *pContext = MediaRecorderContext::GetContext(env, thiz);
+    if(pContext) pContext->OnPreviewFrame(format, buf, width, height);
+    delete[] buf;
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegstudy_camera_FFMediaRecord_native_1OnSurfaceCreated(JNIEnv *env,
+                                                                           jobject thiz) {
+    MediaRecorderContext *pContext = MediaRecorderContext::GetContext(env, thiz);
+    if(pContext) pContext->OnSurfaceCreated();
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegstudy_camera_FFMediaRecord_native_1OnSurfaceChanged(JNIEnv *env,
+                                                                           jobject thiz, jint width,
+                                                                           jint height) {
+    MediaRecorderContext *pContext = MediaRecorderContext::GetContext(env, thiz);
+    if(pContext) pContext->OnSurfaceChanged(width, height);
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegstudy_camera_FFMediaRecord_native_1OnDrawFrame(JNIEnv *env, jobject thiz) {
+    MediaRecorderContext *pContext = MediaRecorderContext::GetContext(env, thiz);
+    if(pContext) pContext->OnDrawFrame();
 }

@@ -14,6 +14,7 @@ import android.view.SurfaceView;
 import android.view.View;
 import android.widget.TextView;
 
+import com.example.ffmpegstudy.camera.CameraActivity;
 import com.example.ffmpegstudy.databinding.ActivityMainBinding;
 
 import static com.example.ffmpegstudy.FFmpegPlayer.VIDEO_RENDER_ANWINDOW;
@@ -37,7 +38,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         binding.ANativeRender.setOnClickListener(this);
         binding.OpenGLRender.setOnClickListener(this);
-
+        binding.CameraRender.setOnClickListener(this);
 
     }
 
@@ -45,18 +46,26 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @SuppressLint("NonConstantResourceId")
     @Override
     public void onClick(View v) {
+        Class<?> className;
         switch (v.getId()) {
             case R.id.ANativeRender: {
-                Intent intent = new Intent(this, ANativeActivity.class);
-                startActivity(intent);
+                className = ANativeActivity.class;
             }
             break;
 
             case R.id.OpenGLRender: {
-                Intent intent = new Intent(this, VideoOpenGLActivity.class);
-                startActivity(intent);
+                className = VideoOpenGLActivity.class;
+                break;
             }
-            break;
+            case R.id.CameraRender: {
+                className = CameraActivity.class;
+                break;
+            }
+            default:
+                className = ANativeActivity.class;
         }
+
+        Intent intent = new Intent(this, className);
+        startActivity(intent);
     }
 }

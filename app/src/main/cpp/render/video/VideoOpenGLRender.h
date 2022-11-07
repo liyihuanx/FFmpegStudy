@@ -43,7 +43,7 @@ private:
 public:
     static VideoOpenGLRender *getInstance();
     static void releaseInstance();
-private:
+
     virtual void onCreate(int videoWidth, int videoHeight, int *dstSize);
 
     virtual void renderVideoFrame(NativeImage *pImage);
