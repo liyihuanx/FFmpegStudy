@@ -4,6 +4,7 @@
 
 #ifndef FFMPEGSTUDY_GLCAMERARENDER_H
 #define FFMPEGSTUDY_GLCAMERARENDER_H
+#define TEXTURE_NUM 3
 
 #include "../render/video/BaseVideoRender.h"
 #include "mutex"
@@ -39,6 +40,18 @@ public:
     static std::mutex camera_gl_mutex;
     NativeImage renderImage;
     int frameIndex;
+
+    // opengl
+    GLuint m_ProgramObj = GL_NONE;
+    GLuint m_FboProgramObj = GL_NONE;
+
+    GLuint m_TextureIds[TEXTURE_NUM];
+    GLuint m_VaoId;
+    GLuint m_VboIds[3];
+
+    vec2 m_TouchXY;
+    vec2 m_ScreenSize;
+
 };
 
 
