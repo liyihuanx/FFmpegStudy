@@ -7,6 +7,7 @@ import androidx.core.app.ActivityCompat;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
+import android.hardware.camera2.CameraCharacteristics;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
 import android.view.TextureView;
@@ -49,6 +50,15 @@ public class CameraActivity extends AppCompatActivity implements Camera2FrameCal
         } else {
             ActivityCompat.requestPermissions(this, REQUEST_PERMISSIONS, CAMERA_PERMISSION_REQUEST_CODE);
         }
+
+        updateTransformMatrix(camera2Help.getCameraId());
+
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mMediaRecorder.unInit();
     }
 
     protected boolean hasPermissionsGranted(String[] permissions) {
@@ -82,5 +92,14 @@ public class CameraActivity extends AppCompatActivity implements Camera2FrameCal
     @Override
     public void onCaptureFrame(byte[] data, int width, int height) {
 
+    }
+
+
+    public void updateTransformMatrix(String cameraId) {
+        if (Integer.valueOf(cameraId) == CameraCharacteristics.LENS_FACING_FRONT) {
+            mMediaRecorder.setTransformMatrix(90, 0);
+        } else {
+            mMediaRecorder.setTransformMatrix(90, 1);
+        }
     }
 }

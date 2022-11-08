@@ -8,6 +8,7 @@
 #include <jni.h>
 #include "GLCameraRender.h"
 #include "../render/video/VideoOpenGLRender.h"
+#include "../render/video/ANativeRender.h"
 
 class MediaRecorderContext {
 public:
@@ -23,6 +24,7 @@ public:
 
     static MediaRecorderContext* GetContext(JNIEnv *env, jobject instance);
 
+    void SetTransformMatrix(float translateX, float translateY, float scaleX, float scaleY, int degree, int mirror);
 
     int Init();
 
@@ -39,6 +41,7 @@ public:
 
 private:
     static jfieldID contextHandle;
+    TransformMatrix m_transformMatrix;
 
 };
 

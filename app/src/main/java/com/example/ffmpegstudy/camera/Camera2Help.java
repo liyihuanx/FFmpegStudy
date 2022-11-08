@@ -311,6 +311,10 @@ class Camera2Help {
         openCamera();
     }
 
+    public String getCameraId() {
+        return mCameraId;
+    }
+
     /**
      * 打开相机
      */

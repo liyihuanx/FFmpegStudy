@@ -8,11 +8,11 @@
 jfieldID MediaRecorderContext::contextHandle = 0L;
 
 MediaRecorderContext::MediaRecorderContext() {
-    VideoOpenGLRender::getInstance();
+    GLCameraRender::getInstance();
 }
 
 MediaRecorderContext::~MediaRecorderContext() {
-    VideoOpenGLRender::releaseInstance();
+    GLCameraRender::releaseInstance();
 }
 
 void MediaRecorderContext::CreateContext(JNIEnv *env, jobject instance) {
@@ -64,13 +64,13 @@ MediaRecorderContext *MediaRecorderContext::GetContext(JNIEnv *env, jobject inst
 }
 
 int MediaRecorderContext::Init() {
-    VideoOpenGLRender::getInstance()->onCreate(0, 0, nullptr);
+    GLCameraRender::getInstance()->onCreate(0, 0, nullptr);
 
     return 0;
 }
 
 int MediaRecorderContext::UnInit() {
-    VideoOpenGLRender::getInstance()->onDestroy();
+    GLCameraRender::getInstance()->onDestroy();
     return 0;
 }
 
@@ -102,17 +102,28 @@ void MediaRecorderContext::OnPreviewFrame(int format, uint8_t *pBuffer, int widt
             break;
     }
 
-    VideoOpenGLRender::getInstance()->renderVideoFrame(&nativeImage);
+    GLCameraRender::getInstance()->renderVideoFrame(&nativeImage);
 }
 
 void MediaRecorderContext::OnSurfaceCreated() {
-    VideoOpenGLRender::getInstance()->onSurfaceCreated();
+    GLCameraRender::getInstance()->onSurfaceCreated();
 }
 
 void MediaRecorderContext::OnSurfaceChanged(int width, int height) {
-    VideoOpenGLRender::getInstance()->onSurfaceChanged(width, height);
+    GLCameraRender::getInstance()->onSurfaceChanged(width, height);
 }
 
 void MediaRecorderContext::OnDrawFrame() {
-    VideoOpenGLRender::getInstance()->onDrawFrame();
+    GLCameraRender::getInstance()->onDrawFrame();
+}
+
+void MediaRecorderContext::SetTransformMatrix(float translateX, float translateY, float scaleX,
+                                              float scaleY, int degree, int mirror) {
+    m_transformMatrix.translateX = translateX;
+    m_transformMatrix.translateY = translateY;
+    m_transformMatrix.scaleX = scaleX;
+    m_transformMatrix.scaleY = scaleY;
+    m_transformMatrix.degree = degree;
+    m_transformMatrix.mirror = mirror;
+    GLCameraRender::getInstance()->UpdateMVPMatrix(&m_transformMatrix);
 }

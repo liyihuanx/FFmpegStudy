@@ -2,9 +2,14 @@ package com.example.ffmpegstudy.camera;
 
 import android.opengl.GLSurfaceView;
 import android.util.Log;
+import android.view.Surface;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
+
+import androidx.annotation.NonNull;
 
 /**
  * @ClassName: FFMediaRecord
@@ -75,6 +80,17 @@ class FFMediaRecord implements GLSurfaceView.Renderer {
         native_UnInit();
     }
 
+    public void setTransformMatrix(int degree, int mirror) {
+        Log.d(TAG, "setTransformMatrix() called with: degree = [" + degree + "], mirror = [" + mirror + "]");
+        native_SetTransformMatrix(0, 0, 1, 1, degree, mirror);
+    }
+
+    public void startRecord(int recorderType, String outUrl, int frameWidth, int frameHeight, long videoBitRate, int fps) {
+        Log.d(TAG, "startRecord() called with: recorderType = [" + recorderType + "], outUrl = [" + outUrl + "], frameWidth = [" + frameWidth + "], frameHeight = [" + frameHeight + "], videoBitRate = [" + videoBitRate + "], fps = [" + fps + "]");
+        native_StartRecord(recorderType, outUrl, frameWidth, frameHeight, videoBitRate, fps);
+    }
+
+
     protected native void native_CreateContext();
 
     protected native void native_DestroyContext();
@@ -90,5 +106,9 @@ class FFMediaRecord implements GLSurfaceView.Renderer {
     protected native void native_OnSurfaceChanged(int width, int height);
 
     protected native void native_OnDrawFrame();
+
+    protected native void native_SetTransformMatrix(float translateX, float translateY, float scaleX, float scaleY, int degree, int mirror);
+
+    protected native int native_StartRecord(int recorderType, String outUrl, int frameWidth, int frameHeight, long videoBitRate, int fps);
 
 }
