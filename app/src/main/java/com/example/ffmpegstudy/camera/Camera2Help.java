@@ -455,4 +455,9 @@ class Camera2Help {
             e.printStackTrace();
         }
     }
+
+    public Size getPreviewSize() {
+        return mPreviewSize;
+    }
+
 }

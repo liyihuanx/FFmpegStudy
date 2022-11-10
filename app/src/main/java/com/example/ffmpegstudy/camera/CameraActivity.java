@@ -10,11 +10,20 @@ import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraCharacteristics;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
+import android.os.Environment;
+import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.Toast;
 
 import com.example.ffmpegstudy.R;
+
+import java.io.File;
+import java.text.SimpleDateFormat;
+import java.util.GregorianCalendar;
+import java.util.Locale;
+
+import static com.example.ffmpegstudy.camera.FFMediaRecord.RECORDER_TYPE_SINGLE_VIDEO;
 
 public class CameraActivity extends AppCompatActivity implements Camera2FrameCallback {
 
@@ -27,6 +36,9 @@ public class CameraActivity extends AppCompatActivity implements Camera2FrameCal
     private FFMediaRecord mMediaRecorder;
 
     private GLSurfaceView glCameraPreview;
+
+    private String mOutUrl;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -40,6 +52,25 @@ public class CameraActivity extends AppCompatActivity implements Camera2FrameCal
 
         mMediaRecorder = new FFMediaRecord();
         mMediaRecorder.init(glCameraPreview);
+
+        findViewById(R.id.btnRecordVideo).setOnClickListener(v -> {
+            int frameWidth = camera2Help.getPreviewSize().getWidth();
+            int frameHeight = camera2Help.getPreviewSize().getHeight();
+            int fps = 25;
+            int bitRate = (int) (frameWidth * frameHeight * fps * 0.25);
+            mOutUrl = getOutFile(".mp4").getAbsolutePath();
+            mMediaRecorder.startRecord(RECORDER_TYPE_SINGLE_VIDEO, mOutUrl, frameWidth, frameHeight, bitRate, fps);
+
+        });
+
+        findViewById(R.id.btnStopVideo).setOnClickListener(v -> {
+            Toast.makeText(CameraActivity.this, "正在编码中.....", Toast.LENGTH_LONG).show();
+            new Thread(() -> {
+                mMediaRecorder.stopRecord();
+                runOnUiThread(() -> Toast.makeText(CameraActivity.this, "编码完成！", Toast.LENGTH_LONG).show());
+            }).start();
+        });
+
     }
 
     @Override
@@ -101,5 +132,23 @@ public class CameraActivity extends AppCompatActivity implements Camera2FrameCal
         } else {
             mMediaRecorder.setTransformMatrix(90, 1);
         }
+    }
+
+    private static final String RESULT_IMG_DIR = "Atestvideo";
+    private static final SimpleDateFormat DateTime_FORMAT = new SimpleDateFormat("yyyyMMddHHmmss", Locale.US);
+
+    public static final File getOutFile(final String ext) {
+        final File dir = new File(Environment.getExternalStorageDirectory(), RESULT_IMG_DIR);
+        Log.d("JNI_LOG", "path=" + dir.toString());
+        dir.mkdirs();
+        if (dir.canWrite()) {
+            return new File(dir, "video_" + getDateTimeString() + ext);
+        }
+        return null;
+    }
+
+    private static final String getDateTimeString() {
+        final GregorianCalendar now = new GregorianCalendar();
+        return DateTime_FORMAT.format(now.getTime());
     }
 }

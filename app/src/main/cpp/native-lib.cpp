@@ -199,7 +199,8 @@ Java_com_example_ffmpegstudy_camera_FFMediaRecord_native_1SetTransformMatrix(JNI
                                                                              jint degree,
                                                                              jint mirror) {
     MediaRecorderContext *pContext = MediaRecorderContext::GetContext(env, thiz);
-    if(pContext) pContext->SetTransformMatrix(translate_x, translate_y, scale_x, scale_y, degree, mirror);
+    if (pContext)
+        pContext->SetTransformMatrix(translate_x, translate_y, scale_x, scale_y, degree, mirror);
 }
 extern "C"
 JNIEXPORT jint JNICALL
@@ -210,5 +211,23 @@ Java_com_example_ffmpegstudy_camera_FFMediaRecord_native_1StartRecord(JNIEnv *en
                                                                       jint frame_height,
                                                                       jlong video_bit_rate,
                                                                       jint fps) {
-    // TODO: implement native_StartRecord()
+
+    const char *url = env->GetStringUTFChars(out_url, nullptr);
+    MediaRecorderContext *pContext = MediaRecorderContext::GetContext(env, thiz);
+    env->ReleaseStringUTFChars(out_url, url);
+    if (pContext)
+        pContext->startRecord(recorder_type, url, frame_width, frame_height, video_bit_rate, fps);
+
+
+    return 0;
+
+}
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_example_ffmpegstudy_camera_FFMediaRecord_native_1StopRecord(JNIEnv *env, jobject thiz) {
+    MediaRecorderContext *pContext = MediaRecorderContext::GetContext(env, thiz);
+    if (pContext) pContext->stopRecord();
+
+    return 0;
+
 }

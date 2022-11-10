@@ -25,9 +25,9 @@ class FFMediaRecord implements GLSurfaceView.Renderer {
     public static final int IMAGE_FORMAT_NV12 = 0x03;
     public static final int IMAGE_FORMAT_I420 = 0x04;
 
-    public static final int RECORDER_TYPE_SINGLE_VIDEO   = 0; //仅录制视频
-    public static final int RECORDER_TYPE_SINGLE_AUDIO   = 1; //仅录制音频
-    public static final int RECORDER_TYPE_AV             = 2; //同时录制音频和视频,打包成 MP4 文件
+    public static final int RECORDER_TYPE_SINGLE_VIDEO = 0; //仅录制视频
+    public static final int RECORDER_TYPE_SINGLE_AUDIO = 1; //仅录制音频
+    public static final int RECORDER_TYPE_AV = 2; //同时录制音频和视频,打包成 MP4 文件
 
 
     private GLSurfaceView mGLSurfaceView;
@@ -38,7 +38,7 @@ class FFMediaRecord implements GLSurfaceView.Renderer {
         System.loadLibrary("ffmpegstudy");
     }
 
-    void init(GLSurfaceView surfaceView){
+    void init(GLSurfaceView surfaceView) {
         mGLSurfaceView = surfaceView;
         mGLSurfaceView.setEGLContextClientVersion(2);
         mGLSurfaceView.setRenderer(this);
@@ -49,7 +49,7 @@ class FFMediaRecord implements GLSurfaceView.Renderer {
     }
 
     public void onPreviewFrame(int format, byte[] data, int width, int height) {
-        Log.d(TAG, "onPreviewFrame() called with: data = [" + data + "], width = [" + width + "], height = [" + height + "]");
+//        Log.d(TAG, "onPreviewFrame() called with: data = [" + data + "], width = [" + width + "], height = [" + height + "]");
         native_OnPreviewFrame(format, data, width, height);
     }
 
@@ -90,6 +90,10 @@ class FFMediaRecord implements GLSurfaceView.Renderer {
         native_StartRecord(recorderType, outUrl, frameWidth, frameHeight, videoBitRate, fps);
     }
 
+    public void stopRecord() {
+        native_StopRecord();
+    }
+
 
     protected native void native_CreateContext();
 
@@ -111,4 +115,5 @@ class FFMediaRecord implements GLSurfaceView.Renderer {
 
     protected native int native_StartRecord(int recorderType, String outUrl, int frameWidth, int frameHeight, long videoBitRate, int fps);
 
+    protected native int native_StopRecord();
 }

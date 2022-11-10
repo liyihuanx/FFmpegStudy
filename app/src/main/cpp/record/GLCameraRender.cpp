@@ -247,8 +247,8 @@ void GLCameraRender::onDrawFrame() {
         LOGD("GLCameraRender::OnDrawFrame CreateFrameBufferObj fail");
         return;
     }
-    LOGD("GLCameraRender::OnDrawFrame [w, h]=[%d, %d], format=%d", renderImage.width,
-         renderImage.height, renderImage.format);
+//    LOGD("GLCameraRender::OnDrawFrame [w, h]=[%d, %d], format=%d", renderImage.width,
+//         renderImage.height, renderImage.format);
     frameIndex++;
 
 //    UpdateExtTexture();
@@ -457,8 +457,9 @@ bool GLCameraRender::CreateFrameBufferObj() {
 }
 
 
+// 从FBO拿到可渲染的帧
 void GLCameraRender::GetRenderFrameFromFBO() {
-    LOGD("GLCameraRender::GetRenderFrameFromFBO m_RenderFrameCallback=%p", m_RenderFrameCallback);
+//    LOGD("GLCameraRender::GetRenderFrameFromFBO m_RenderFrameCallback=%p", m_RenderFrameCallback);
     if(m_RenderFrameCallback != nullptr) {
         uint8_t *pBuffer = new uint8_t[renderImage.width * renderImage.height * 4];
         NativeImage nativeImage = renderImage;
@@ -468,6 +469,7 @@ void GLCameraRender::GetRenderFrameFromFBO() {
         nativeImage.pLineSize[0] = nativeImage.width * 4;
         nativeImage.ppPlane[0] = pBuffer;
         glReadPixels(0, 0, nativeImage.width, nativeImage.height, GL_RGBA, GL_UNSIGNED_BYTE, pBuffer);
+        // 通过回调，调用将录制的帧传入，并编码
         m_RenderFrameCallback(m_CallbackContext, &nativeImage);
         delete []pBuffer;
     }
@@ -555,9 +557,9 @@ void GLCameraRender::UpdateMVPMatrix(TransformMatrix *pTransformMatrix) {
     Model = glm::translate(Model,
                            glm::vec3(pTransformMatrix->translateX, pTransformMatrix->translateY, 0.0f));
 
-    LOGD("GLCameraRender::UpdateMVPMatrix rotate %d,%.2f,%0.5f,%0.5f,%0.5f,%0.5f,", pTransformMatrix->degree, fRotate,
-            pTransformMatrix->translateX, pTransformMatrix->translateY,
-            fFactorX * pTransformMatrix->scaleX, fFactorY * pTransformMatrix->scaleY);
+//    LOGD("GLCameraRender::UpdateMVPMatrix rotate %d,%.2f,%0.5f,%0.5f,%0.5f,%0.5f,", pTransformMatrix->degree, fRotate,
+//            pTransformMatrix->translateX, pTransformMatrix->translateY,
+//            fFactorX * pTransformMatrix->scaleX, fFactorY * pTransformMatrix->scaleY);
 
     m_MVPMatrix = Projection * View * Model;
 }

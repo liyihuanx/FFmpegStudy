@@ -63,9 +63,20 @@ MediaRecorderContext *MediaRecorderContext::GetContext(JNIEnv *env, jobject inst
     return nullptr;
 }
 
+// 回调函数，从FBO拿到渲染数据后，回调到此处
+void MediaRecorderContext::OnGLRenderFrame(void *ctx, NativeImage *pImage) {
+//    LOGD("MediaRecorderContext::OnGLRenderFrame ctx=%p, pImage=%p", ctx, pImage);
+    MediaRecorderContext *context = static_cast<MediaRecorderContext *>(ctx);
+    std::unique_lock<std::mutex> lock(context->record_mutex);
+    if(context->videoRecorder != nullptr)
+        context->videoRecorder->DispatchRecordFrame(pImage);
+
+}
+
+
 int MediaRecorderContext::Init() {
     GLCameraRender::getInstance()->onCreate(0, 0, nullptr);
-
+    GLCameraRender::getInstance()->setRenderCallback(this, OnGLRenderFrame);
     return 0;
 }
 
@@ -127,3 +138,31 @@ void MediaRecorderContext::SetTransformMatrix(float translateX, float translateY
     m_transformMatrix.mirror = mirror;
     GLCameraRender::getInstance()->UpdateMVPMatrix(&m_transformMatrix);
 }
+
+void MediaRecorderContext::startRecord(int recorderType, const char* outUrl, int frameWidth, int frameHeight, long videoBitRate, int fps) {
+    LOGD("MediaRecorderContext::StartRecord recorderType=%d, outUrl=%s, [w,h]=[%d,%d], videoBitRate=%ld, fps=%d", recorderType, outUrl, frameWidth, frameHeight, videoBitRate, fps);
+    std::unique_lock<std::mutex> lock(record_mutex);
+    switch (recorderType) {
+        case RECORDER_TYPE_SINGLE_VIDEO:
+            if(videoRecorder == nullptr) {
+                videoRecorder = new SingleVideoRecorder(outUrl, frameHeight, frameWidth, videoBitRate, fps);
+                videoRecorder->StartRecord();
+            }
+            break;
+
+        default:
+            break;
+    }
+
+}
+
+void MediaRecorderContext::stopRecord() {
+    std::unique_lock<std::mutex> lock(record_mutex);
+    if(videoRecorder != nullptr) {
+        videoRecorder->StopRecord();
+        delete videoRecorder;
+        videoRecorder = nullptr;
+    }
+}
+
+

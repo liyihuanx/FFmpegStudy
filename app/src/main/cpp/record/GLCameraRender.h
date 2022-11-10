@@ -94,7 +94,7 @@ public:
     }
 
     //添加好滤镜之后，视频帧的回调，然后将带有滤镜的视频帧放入编码队列
-    void SetRenderCallback(void *ctx, OnRenderFrameCallback callback) {
+    void setRenderCallback(void *ctx, OnRenderFrameCallback callback) {
         m_CallbackContext = ctx;
         m_RenderFrameCallback = callback;
     }

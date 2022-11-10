@@ -15,6 +15,8 @@ extern "C" {
 
 #include "../log4c.h"
 #include "thread"
+#include "../util/ImageDef.h"
+#include "../ThreadSafeQueue.h"
 
 using namespace std;
 
@@ -28,23 +30,29 @@ public:
 
     int StopRecord();
 
+    int DispatchRecordFrame(NativeImage *inputFrame);
+
 private:
-    static void StartH264EncoderThread(SingleVideoRecorder *context);
+    static void StartH264EncoderThread(SingleVideoRecorder *recorder);
 
     int EncodeFrame(AVFrame *pFrame);
 
 private:
     char *out_url = nullptr;
     thread *encodeThread = nullptr;
+    ThreadSafeQueue<NativeImage *> frameQueue;
+    volatile int isExit = 0;
 
 
     AVFormatContext *avFormatContext = nullptr;
     AVStream *avStream = nullptr;
     AVCodec *avCodec = nullptr;
     AVCodecContext *avCodecContext = nullptr;
+    SwsContext *swsContext = nullptr;
+
 
     AVFrame *frame = nullptr;
-    AVPacket *packet = nullptr;
+    AVPacket packet;
     uint8_t *frame_buf = nullptr;
 
     // 帧的信息
@@ -52,6 +60,7 @@ private:
     int frame_height = -1;
     long bit_rate = -1;
     int fps = -1;
+    int frame_index = 0;
 
 };
 

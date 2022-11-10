@@ -5,10 +5,15 @@
 #ifndef FFMPEGSTUDY_MEDIARECORDERCONTEXT_H
 #define FFMPEGSTUDY_MEDIARECORDERCONTEXT_H
 
+#define RECORDER_TYPE_SINGLE_VIDEO  0 //仅录制视频
+#define RECORDER_TYPE_SINGLE_AUDIO  1 //仅录制音频
+#define RECORDER_TYPE_AV            2 //同时录制音频和视频,打包成 MP4 文件
+
 #include <jni.h>
 #include "GLCameraRender.h"
 #include "../render/video/VideoOpenGLRender.h"
 #include "../render/video/ANativeRender.h"
+#include "SingleVideoRecorder.h"
 
 class MediaRecorderContext {
 public:
@@ -26,6 +31,8 @@ public:
 
     void SetTransformMatrix(float translateX, float translateY, float scaleX, float scaleY, int degree, int mirror);
 
+    static void OnGLRenderFrame(void *ctx, NativeImage * pImage);
+
     int Init();
 
     int UnInit();
@@ -39,10 +46,15 @@ public:
 
     void OnDrawFrame();
 
+    void startRecord(int recorderType, const char* outUrl, int frameWidth, int frameHeight, long videoBitRate, int fps);
+
+    void stopRecord();
+
 private:
     static jfieldID contextHandle;
     TransformMatrix m_transformMatrix;
-
+    SingleVideoRecorder *videoRecorder = nullptr;
+    mutex record_mutex;
 };
 
 
