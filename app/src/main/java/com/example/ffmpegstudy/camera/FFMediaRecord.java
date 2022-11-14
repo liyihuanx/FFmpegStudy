@@ -17,7 +17,7 @@ import androidx.annotation.NonNull;
  * @Author: liyihuan
  * @Date: 2022/11/7 20:42
  */
-class FFMediaRecord implements GLSurfaceView.Renderer {
+public class FFMediaRecord implements GLSurfaceView.Renderer {
     private static final String TAG = "FFMediaRecord";
 
     public static final int IMAGE_FORMAT_RGBA = 0x01;
@@ -38,12 +38,13 @@ class FFMediaRecord implements GLSurfaceView.Renderer {
         System.loadLibrary("ffmpegstudy");
     }
 
-    void init(GLSurfaceView surfaceView) {
-        mGLSurfaceView = surfaceView;
-        mGLSurfaceView.setEGLContextClientVersion(2);
-        mGLSurfaceView.setRenderer(this);
-        mGLSurfaceView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
-
+    public void init(GLSurfaceView surfaceView) {
+        if (surfaceView != null) {
+            mGLSurfaceView = surfaceView;
+            mGLSurfaceView.setEGLContextClientVersion(2);
+            mGLSurfaceView.setRenderer(this);
+            mGLSurfaceView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
+        }
         native_CreateContext();
         native_Init();
     }
@@ -95,6 +96,10 @@ class FFMediaRecord implements GLSurfaceView.Renderer {
     }
 
 
+    public void onAudioData(byte[] data, int dataSize) {
+        native_onAudioData(data,dataSize);
+    }
+
     protected native void native_CreateContext();
 
     protected native void native_DestroyContext();
@@ -116,4 +121,8 @@ class FFMediaRecord implements GLSurfaceView.Renderer {
     protected native int native_StartRecord(int recorderType, String outUrl, int frameWidth, int frameHeight, long videoBitRate, int fps);
 
     protected native int native_StopRecord();
+
+    protected native void native_onAudioData(byte[] data, int dataSize);
+
+
 }

@@ -4,30 +4,21 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:gravity="center"
     android:orientation="vertical"
-    tools:context=".MainActivity">
+    tools:context=".audiorecord.AudioRecordActivity">
 
     <Button
-        android:id="@+id/ANativeRender"
+        android:id="@+id/btnStartAudio"
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:text="ANative渲染" />
+        android:layout_gravity="center"
+        android:text="开始录音" />
 
     <Button
-        android:id="@+id/OpenGLRender"
+        android:id="@+id/btnStopAudio"
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:text="OpenGL渲染" />
-
-    <Button
-        android:id="@+id/CameraRender"
-        android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:text="相机预览" />
-
-    <Button
-        android:id="@+id/AudioRecord"
-        android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:text="音频录音" />
+        android:layout_gravity="center"
+        android:text="停止录音" />
 </LinearLayout>

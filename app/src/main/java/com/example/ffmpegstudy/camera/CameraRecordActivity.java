@@ -6,14 +6,11 @@ import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
-import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraCharacteristics;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
-import android.view.TextureView;
-import android.view.View;
 import android.widget.Toast;
 
 import com.example.ffmpegstudy.R;
@@ -25,7 +22,7 @@ import java.util.Locale;
 
 import static com.example.ffmpegstudy.camera.FFMediaRecord.RECORDER_TYPE_SINGLE_VIDEO;
 
-public class CameraActivity extends AppCompatActivity implements Camera2FrameCallback {
+public class CameraRecordActivity extends AppCompatActivity implements Camera2FrameCallback {
 
     private int fps = 25;
     private Camera2Help camera2Help;
@@ -64,10 +61,10 @@ public class CameraActivity extends AppCompatActivity implements Camera2FrameCal
         });
 
         findViewById(R.id.btnStopVideo).setOnClickListener(v -> {
-            Toast.makeText(CameraActivity.this, "正在编码中.....", Toast.LENGTH_LONG).show();
+            Toast.makeText(CameraRecordActivity.this, "正在编码中.....", Toast.LENGTH_LONG).show();
             new Thread(() -> {
                 mMediaRecorder.stopRecord();
-                runOnUiThread(() -> Toast.makeText(CameraActivity.this, "编码完成！", Toast.LENGTH_LONG).show());
+                runOnUiThread(() -> Toast.makeText(CameraRecordActivity.this, "编码完成！", Toast.LENGTH_LONG).show());
             }).start();
         });
 

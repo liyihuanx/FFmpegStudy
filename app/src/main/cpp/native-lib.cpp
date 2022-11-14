@@ -218,7 +218,6 @@ Java_com_example_ffmpegstudy_camera_FFMediaRecord_native_1StartRecord(JNIEnv *en
     if (pContext)
         pContext->startRecord(recorder_type, url, frame_width, frame_height, video_bit_rate, fps);
 
-
     return 0;
 
 }
@@ -229,5 +228,21 @@ Java_com_example_ffmpegstudy_camera_FFMediaRecord_native_1StopRecord(JNIEnv *env
     if (pContext) pContext->stopRecord();
 
     return 0;
+
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegstudy_camera_FFMediaRecord_native_1onAudioData(JNIEnv *env, jobject thiz,
+                                                                      jbyteArray data,
+                                                                      jint data_size) {
+
+
+    int len = env->GetArrayLength (data);
+    auto* buf = new unsigned char[len];
+    env->GetByteArrayRegion(data, 0, len, reinterpret_cast<jbyte*>(buf));
+    MediaRecorderContext *pContext = MediaRecorderContext::GetContext(env, thiz);
+    if(pContext) pContext->OnAudioData(buf, len);
+    delete[] buf;
+
 
 }

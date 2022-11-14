@@ -5,7 +5,6 @@
 #ifndef FFMPEGSTUDY_AUDIOFRAME_H
 #define FFMPEGSTUDY_AUDIOFRAME_H
 
-#endif //FFMPEGSTUDY_AUDIOFRAME_H
 
 class AudioFrame {
 public:
@@ -29,3 +28,6 @@ public:
     int dataSize = 0;
     bool hardCopy = true;
 };
+
+// 只有头文件，这句话放最后！
+#endif //FFMPEGSTUDY_AUDIOFRAME_H

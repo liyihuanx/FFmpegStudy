@@ -10,10 +10,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FFmpegStudy">
         <activity
+            android:name=".audiorecord.AudioRecordActivity"
+            android:exported="false" />
+        <activity
             android:name=".ANativeActivity"
             android:exported="false" />
         <activity
-            android:name=".camera.CameraActivity"
+            android:name=".camera.CameraRecordActivity"
             android:exported="false" />
         <activity
             android:name=".VideoOpenGLActivity"
@@ -32,7 +35,6 @@
     <uses-feature
         android:glEsVersion="0x00020000"
         android:required="true" />
-
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />

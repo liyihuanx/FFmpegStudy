@@ -1,23 +1,17 @@
 package com.example.ffmpegstudy;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
+import android.media.AudioRecord;
 import android.os.Bundle;
 import android.os.Environment;
-import android.util.Log;
-import android.view.Surface;
-import android.view.SurfaceHolder;
-import android.view.SurfaceView;
 import android.view.View;
-import android.widget.TextView;
 
-import com.example.ffmpegstudy.camera.CameraActivity;
+import com.example.ffmpegstudy.audiorecord.AudioRecordActivity;
+import com.example.ffmpegstudy.camera.CameraRecordActivity;
 import com.example.ffmpegstudy.databinding.ActivityMainBinding;
-
-import static com.example.ffmpegstudy.FFmpegPlayer.VIDEO_RENDER_ANWINDOW;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
@@ -39,6 +33,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         binding.ANativeRender.setOnClickListener(this);
         binding.OpenGLRender.setOnClickListener(this);
         binding.CameraRender.setOnClickListener(this);
+        binding.AudioRecord.setOnClickListener(this);
 
     }
 
@@ -58,7 +53,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 break;
             }
             case R.id.CameraRender: {
-                className = CameraActivity.class;
+                className = CameraRecordActivity.class;
+                break;
+            }
+            case R.id.AudioRecord: {
+                className = AudioRecordActivity.class;
                 break;
             }
             default:

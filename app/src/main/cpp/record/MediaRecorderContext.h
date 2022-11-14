@@ -14,6 +14,8 @@
 #include "../render/video/VideoOpenGLRender.h"
 #include "../render/video/ANativeRender.h"
 #include "SingleVideoRecorder.h"
+#include "SingleAudioRecorder.h"
+#include "../render/audio/AudioFrame.h"
 
 class MediaRecorderContext {
 public:
@@ -50,10 +52,14 @@ public:
 
     void stopRecord();
 
+    void OnAudioData(uint8_t *pData, int size);
+
 private:
     static jfieldID contextHandle;
     TransformMatrix m_transformMatrix;
     SingleVideoRecorder *videoRecorder = nullptr;
+    SingleAudioRecorder *audioRecorder = nullptr;
+
     mutex record_mutex;
 };
 

@@ -68,7 +68,7 @@ void MediaRecorderContext::OnGLRenderFrame(void *ctx, NativeImage *pImage) {
 //    LOGD("MediaRecorderContext::OnGLRenderFrame ctx=%p, pImage=%p", ctx, pImage);
     MediaRecorderContext *context = static_cast<MediaRecorderContext *>(ctx);
     std::unique_lock<std::mutex> lock(context->record_mutex);
-    if(context->videoRecorder != nullptr)
+    if (context->videoRecorder != nullptr)
         context->videoRecorder->DispatchRecordFrame(pImage);
 
 }
@@ -139,14 +139,24 @@ void MediaRecorderContext::SetTransformMatrix(float translateX, float translateY
     GLCameraRender::getInstance()->UpdateMVPMatrix(&m_transformMatrix);
 }
 
-void MediaRecorderContext::startRecord(int recorderType, const char* outUrl, int frameWidth, int frameHeight, long videoBitRate, int fps) {
-    LOGD("MediaRecorderContext::StartRecord recorderType=%d, outUrl=%s, [w,h]=[%d,%d], videoBitRate=%ld, fps=%d", recorderType, outUrl, frameWidth, frameHeight, videoBitRate, fps);
+void MediaRecorderContext::startRecord(int recorderType, const char *outUrl, int frameWidth,
+                                       int frameHeight, long videoBitRate, int fps) {
+    LOGD("MediaRecorderContext::StartRecord recorderType=%d, outUrl=%s, [w,h]=[%d,%d], videoBitRate=%ld, fps=%d",
+         recorderType, outUrl, frameWidth, frameHeight, videoBitRate, fps);
     std::unique_lock<std::mutex> lock(record_mutex);
     switch (recorderType) {
         case RECORDER_TYPE_SINGLE_VIDEO:
-            if(videoRecorder == nullptr) {
-                videoRecorder = new SingleVideoRecorder(outUrl, frameHeight, frameWidth, videoBitRate, fps);
+            if (videoRecorder == nullptr) {
+                videoRecorder = new SingleVideoRecorder(outUrl, frameHeight, frameWidth,
+                                                        videoBitRate, fps);
                 videoRecorder->StartRecord();
+            }
+            break;
+        case RECORDER_TYPE_SINGLE_AUDIO:
+            if (audioRecorder == nullptr) {
+                audioRecorder = new SingleAudioRecorder(outUrl, DEFAULT_SAMPLE_RATE,
+                                                        AV_CH_LAYOUT_STEREO, AV_SAMPLE_FMT_S16);
+                audioRecorder->StartRecord();
             }
             break;
 
@@ -158,11 +168,24 @@ void MediaRecorderContext::startRecord(int recorderType, const char* outUrl, int
 
 void MediaRecorderContext::stopRecord() {
     std::unique_lock<std::mutex> lock(record_mutex);
-    if(videoRecorder != nullptr) {
+    if (videoRecorder != nullptr) {
         videoRecorder->StopRecord();
         delete videoRecorder;
         videoRecorder = nullptr;
     }
+
+    if (audioRecorder != nullptr) {
+        audioRecorder->StopRecord();
+        delete audioRecorder;
+        audioRecorder = nullptr;
+    }
+}
+
+void MediaRecorderContext::OnAudioData(uint8_t *pData, int size) {
+    LOGD("MediaRecorderContext::OnAudioData pData=%p, dataSize=%d", pData, size);
+    AudioFrame audioFrame(pData, size, false);
+    if (audioRecorder != nullptr)
+        audioRecorder->DispatchRecordFrame(&audioFrame);
 }
 
 
