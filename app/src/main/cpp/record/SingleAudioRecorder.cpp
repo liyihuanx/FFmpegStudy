@@ -58,7 +58,15 @@ int SingleAudioRecorder::StartRecord() {
             break;
         }
 
-        avCodecContext = avStream->codec;
+        // 5.编码器上下文，设置编码信息
+        avCodecContext = avcodec_alloc_context3(avCodec);
+        if (avCodecContext == nullptr) {
+            result = -1;
+            LOGD("SingleVideoRecorder::StartRecord avcodec_alloc_context3 ret=%d", result);
+            break;
+        }
+
+//        avCodecContext = avStream->codec;
         avCodecContext->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
         LOGD("SingleAudioRecorder::StartRecord avOutputFormat->audio_codec=%d",
              avOutputFormat->audio_codec);
@@ -71,6 +79,12 @@ int SingleAudioRecorder::StartRecord() {
                 avCodecContext->channel_layout);
         avCodecContext->bit_rate = 96000;
 
+        // 6.
+        result = avcodec_parameters_from_context(avStream->codecpar, avCodecContext);
+        if (result < 0) {
+            LOGD("SingleVideoRecorder::StartRecord avcodec_parameters_from_context ret=%d", result);
+            break;
+        }
 
         // 7.打开编码器
         result = avcodec_open2(avCodecContext, avCodec, nullptr);

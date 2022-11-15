@@ -34,6 +34,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         binding.OpenGLRender.setOnClickListener(this);
         binding.CameraRender.setOnClickListener(this);
         binding.AudioRecord.setOnClickListener(this);
+        binding.MediaCodecDecode.setOnClickListener(this);
 
     }
 
@@ -60,6 +61,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 className = AudioRecordActivity.class;
                 break;
             }
+
+            case R.id.MediaCodecDecode: {
+                className = MediaCodecActivity.class;
+                break;
+            }
+
             default:
                 className = ANativeActivity.class;
         }

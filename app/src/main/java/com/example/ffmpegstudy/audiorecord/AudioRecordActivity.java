@@ -28,7 +28,7 @@ public class AudioRecordActivity extends AppCompatActivity implements AudioRecor
     private AudioRecorder mAudioRecorder;
 
     private static final int AUDIO_PERMISSION_REQUEST_CODE = 1;
-    private static final String[] REQUEST_PERMISSIONS = {Manifest.permission.RECORD_AUDIO, Manifest.permission.WRITE_EXTERNAL_STORAGE,};
+    private static final String[] REQUEST_PERMISSIONS = {Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO, Manifest.permission.WRITE_EXTERNAL_STORAGE,};
     private String mOutUrl;
 
     @Override
@@ -43,7 +43,7 @@ public class AudioRecordActivity extends AppCompatActivity implements AudioRecor
         findViewById(R.id.btnStartAudio).setOnClickListener(v -> {
             mOutUrl = getOutFile(".aac").getAbsolutePath();
             mMediaRecorder.startRecord(RECORDER_TYPE_SINGLE_AUDIO, mOutUrl, 0, 0, 0, 0);
-            mAudioRecorder = new AudioRecorder( this);
+            mAudioRecorder = new AudioRecorder(this);
             mAudioRecorder.start();
             Toast.makeText(this, "开始录音.....", Toast.LENGTH_LONG).show();
         });
