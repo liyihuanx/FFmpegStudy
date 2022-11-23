@@ -4,7 +4,6 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
-import android.media.AudioRecord;
 import android.os.Bundle;
 import android.os.Environment;
 import android.view.View;
@@ -12,6 +11,7 @@ import android.view.View;
 import com.example.ffmpegstudy.audiorecord.AudioRecordActivity;
 import com.example.ffmpegstudy.camera.CameraRecordActivity;
 import com.example.ffmpegstudy.databinding.ActivityMainBinding;
+import com.example.ffmpegstudy.mediacodec.MediaCodecActivity;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
@@ -35,7 +35,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         binding.CameraRender.setOnClickListener(this);
         binding.AudioRecord.setOnClickListener(this);
         binding.MediaCodecDecode.setOnClickListener(this);
-
+        binding.NewMediaCodecDecode.setOnClickListener(this);
     }
 
 
@@ -64,6 +64,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             case R.id.MediaCodecDecode: {
                 className = MediaCodecActivity.class;
+                break;
+            }
+
+            case R.id.NewMediaCodecDecode: {
+                className = NewMediaCodecActivity.class;
                 break;
             }
 
