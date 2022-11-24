@@ -12,6 +12,7 @@ import com.example.ffmpegstudy.audiorecord.AudioRecordActivity;
 import com.example.ffmpegstudy.camera.CameraRecordActivity;
 import com.example.ffmpegstudy.databinding.ActivityMainBinding;
 import com.example.ffmpegstudy.mediacodec.MediaCodecActivity;
+import com.example.ffmpegstudy.mediacodec.NewMediaCodecActivity;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
