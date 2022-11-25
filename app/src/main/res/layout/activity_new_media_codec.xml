@@ -13,40 +13,40 @@
         android:layout_height="50dp"
         android:text="开始解码" />
 
-    <Button
-        android:id="@+id/btnDecoderStop"
-        android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:text="暂停解码" />
+<!--    <Button-->
+<!--        android:id="@+id/btnDecoderStop"-->
+<!--        android:layout_width="match_parent"-->
+<!--        android:layout_height="50dp"-->
+<!--        android:text="暂停解码" />-->
 
-    <Button
-        android:id="@+id/btnDecoderFinish"
-        android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:text="结束解码" />
+<!--    <Button-->
+<!--        android:id="@+id/btnDecoderFinish"-->
+<!--        android:layout_width="match_parent"-->
+<!--        android:layout_height="50dp"-->
+<!--        android:text="结束解码" />-->
 
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="100dp" />
+<!--    <View-->
+<!--        android:layout_width="match_parent"-->
+<!--        android:layout_height="100dp" />-->
 
-    <Button
-        android:id="@+id/btnEncoderStart"
-        android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:text="开始编码" />
+<!--    <Button-->
+<!--        android:id="@+id/btnEncoderStart"-->
+<!--        android:layout_width="match_parent"-->
+<!--        android:layout_height="50dp"-->
+<!--        android:text="开始编码" />-->
 
-    <Button
-        android:id="@+id/btnEncoderStop"
-        android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:text="暂停编码" />
+<!--    <Button-->
+<!--        android:id="@+id/btnEncoderStop"-->
+<!--        android:layout_width="match_parent"-->
+<!--        android:layout_height="50dp"-->
+<!--        android:text="暂停编码" />-->
 
-    <Button
-        android:id="@+id/btnEncoderFinish"
-        android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:text="结束编码" />
+<!--    <Button-->
+<!--        android:id="@+id/btnEncoderFinish"-->
+<!--        android:layout_width="match_parent"-->
+<!--        android:layout_height="50dp"-->
+<!--        android:text="结束编码" />-->
 
 
 

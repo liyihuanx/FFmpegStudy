@@ -31,6 +31,16 @@ public class NewMediaCodecActivity extends AppCompatActivity {
             public void progress(int progress) {
 
             }
+
+            @Override
+            public void onDecode(byte[] yuv, int width, int height, int frameCount, long presentationTimeUs) {
+
+            }
+
+            @Override
+            public void onFinish() {
+
+            }
         });
         findViewById(R.id.btnDecoderStart).setOnClickListener(v -> {
             videoDecoder.startDecode();

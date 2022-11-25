@@ -9,10 +9,13 @@ import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
+import android.media.MediaMuxer;
 import android.os.Environment;
+import android.os.FileUtils;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.example.ffmpegstudy.Constant;
 import com.example.ffmpegstudy.camera.CameraUtil;
 
 import java.io.BufferedOutputStream;
@@ -37,9 +40,21 @@ class VideoDecoder {
     public final static int COLOR_FORMAT_NV12 = 3;
 
 
-    private final String inputFile = Environment.getExternalStorageDirectory() + "/Atestvideo/test.mp4";
-    private final String outputFile = Environment.getExternalStorageDirectory() + "/Atestvideo/mediacodecout.mp4";
-    private final String outputYuvFile = Environment.getExternalStorageDirectory() + "/Atestvideo/mediacodecout.yuv";
+//    private final String inputFile = Environment.getExternalStorageDirectory() + "/Atestvideo/test.mp4";
+//    private final String outputFile = Environment.getExternalStorageDirectory() + "/Atestvideo/mediacodecout.mp4";
+//    private final String outputYuvFile = Environment.getExternalStorageDirectory() + "/Atestvideo/mediacodecout.yuv";
+
+
+    private final String inputFile = "/data/data/com.example.ffmpegstudy/cache/test.mp4";
+    private final String outputFile = "/data/data/com.example.ffmpegstudy/cache/mediacodecout.mp4";
+    private final String outputYuvFile = "/data/data/com.example.ffmpegstudy/cache/mediacodecout.yuv";
+
+
+//    private final String inputFile = Constant.getTestMp4FilePath();
+//    private final String outputYuvFile = Constant.getTestFilePath("mediacodecout.yuv");
+//    private final String outputFile = Constant.getTestFilePath("mediacodecout.mp4");
+//    private final String outputH264File = Constant.getTestFilePath("mediacodecout.h264");
+
 
     private MediaExtractor mediaExtractor;
     private MediaFormat decodeMediaFormat;
@@ -58,12 +73,21 @@ class VideoDecoder {
     private static final int DECODE_COLOR_FORMAT = MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible;
     private static final long DEFAULT_TIMEOUT_US = 10000;
 
+
+    // 编码器
+    private VideoEncoder videoEncoder;
+
     public interface PreviewCallback {
         void info(int width, int height, int fps);
 
         void getBitmap(Bitmap bitmap);
 
         void progress(int progress);
+
+        void onDecode(byte[] yuv, int width, int height, int frameCount, long presentationTimeUs);
+
+        void onFinish();
+
     }
 
     public void setPreviewCallback(PreviewCallback previewCallback) {
@@ -108,6 +132,11 @@ class VideoDecoder {
             decoder = MediaCodec.createDecoderByType(mime);
             decoder.configure(decodeMediaFormat, null, null, 0);
             decoder.start();
+
+            Log.d(TAG, "encodeMediaFormat::" + decodeMediaFormat.toString());
+
+            videoEncoder = new VideoEncoder(videoWidth,videoHeight);
+
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -167,6 +196,7 @@ class VideoDecoder {
 
         boolean isInputEOS = false;
         boolean isOutputEOS = false;
+        int frameCount = 0;
 
         while (!isStop) {
             if (!isInputEOS) {
@@ -184,6 +214,7 @@ class VideoDecoder {
                         decoder.queueInputBuffer(inputBufferIndex, 0, sampleSize, mediaExtractor.getSampleTime(), 0);
                         // 在MediaExtractor执行完一次readSampleData方法后，需要调用advance()去跳到下一个sample，然后再次读取数据
                         mediaExtractor.advance();
+                        isInputEOS = false;
                     }
                 }
             }
@@ -204,14 +235,18 @@ class VideoDecoder {
                     Image image = decoder.getOutputImage(outputBufferIndex);
                     byte[] YUV = getDataFromImage(image, COLOR_FORMAT_I420);
                     writeToFile(YUV, outputYuvFile, true);
-//
-//                    boolean end = ((videoBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0);
-//                    encodeData(i420bytes, outputH264Path, currTime, end);
-//
+
+                    if (previewCallback != null) {
+                        previewCallback.onDecode(YUV, videoWidth, videoHeight, frameCount++, currTime);
+                    }
+
+                    boolean end = ((videoBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0);
+                    videoEncoder.encodeFrame(YUV, currTime, end);
+
 //                    byte[] nv21bytes = BitmapUtil.I420Tonv21(i420bytes, width, height);
 //                    Bitmap bitmap = BitmapUtil.getBitmapImageFromYUV(nv21bytes, width, height);
-//
 //                    previewCallback.getBitmap(bitmap);
+
 //                    int progress = (int) (currTime * 100 / totalTime);
 //                    previewCallback.progress(progress);
 //
@@ -224,12 +259,24 @@ class VideoDecoder {
 
             if ((videoBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                 Log.v(TAG, "buffer stream end");
+                if (previewCallback != null) {
+                    previewCallback.onFinish();
+                }
                 break;
             }
 
-        }
+        } // while end
 
+
+        videoEncoder.release();
+
+        mediaExtractor.release();
+        decoder.stop();
+        decoder.release();
     }
+
+    private int encodeVideoTrackIndex = -1;
+
 
     private byte[] getDataFromImage(Image image, int colorFormat) {
         // 指定有效区域
@@ -304,8 +351,11 @@ class VideoDecoder {
                     buffer.get(data, channelOffset, length);
                     channelOffset += length;
                 } else {
+                    // 计算UV分量的长度
                     length = (w - 1) * pixelStride + 1;
+                    // 获取UV分量的数据
                     buffer.get(rowData, 0, length);
+                    // 单独取出某个分量
                     for (int col = 0; col < w; col++) {
                         data[channelOffset] = rowData[col * pixelStride];
                         channelOffset += outputStride;
@@ -337,29 +387,7 @@ class VideoDecoder {
     }
 
 
-    // OMX.google开头的是软解码
-    // OMX.开头的是硬解码
-    public static String getExpectedEncodeCodec(String expectedMimeType, int expectedColorFormat) {
-        MediaCodecList allMediaCodecLists = new MediaCodecList(-1);
-        for (MediaCodecInfo mediaCodecInfo : allMediaCodecLists.getCodecInfos()) {
-            if (mediaCodecInfo.isEncoder()) {
-                String[] supportTypes = mediaCodecInfo.getSupportedTypes();
-                for (String supportType : supportTypes) {
-                    if (supportType.equals(expectedMimeType)) {
-                        Log.d(TAG, "编码器名称:" + mediaCodecInfo.getName() + "  " + supportType);
-                        MediaCodecInfo.CodecCapabilities codecCapabilities = mediaCodecInfo.getCapabilitiesForType(expectedMimeType);
-                        int[] colorFormats = codecCapabilities.colorFormats;
-                        for (int colorFormat : colorFormats) {
-                            if (colorFormat == expectedColorFormat) {
-                                return mediaCodecInfo.getName();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return "";
-    }
+
 
     private boolean isColorFormatSupported(int colorFormat, MediaCodecInfo.CodecCapabilities caps) {
         for (int c : caps.colorFormats) {
@@ -371,7 +399,7 @@ class VideoDecoder {
     }
 
 
-    public static boolean writeToFile(byte[] bytes, String fullfilename, boolean isAppend) {
+    private boolean writeToFile(byte[] bytes, String fullfilename, boolean isAppend) {
         if (bytes == null || TextUtils.isEmpty(fullfilename)) {
             return false;
         }
@@ -396,5 +424,28 @@ class VideoDecoder {
         return true;
     }
 
+    // OMX.google开头的是软解码
+    // OMX.开头的是硬解码
+    private String getExpectedEncodeCodec(String expectedMimeType, int expectedColorFormat) {
+        MediaCodecList allMediaCodecLists = new MediaCodecList(-1);
+        for (MediaCodecInfo mediaCodecInfo : allMediaCodecLists.getCodecInfos()) {
+            if (mediaCodecInfo.isEncoder()) {
+                String[] supportTypes = mediaCodecInfo.getSupportedTypes();
+                for (String supportType : supportTypes) {
+                    if (supportType.equals(expectedMimeType)) {
+                        Log.d(TAG, "编码器名称:" + mediaCodecInfo.getName() + "  " + supportType);
+                        MediaCodecInfo.CodecCapabilities codecCapabilities = mediaCodecInfo.getCapabilitiesForType(expectedMimeType);
+                        int[] colorFormats = codecCapabilities.colorFormats;
+                        for (int colorFormat : colorFormats) {
+                            if (colorFormat == expectedColorFormat) {
+                                return mediaCodecInfo.getName();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return "";
+    }
 
 }
